@@ -1,0 +1,508 @@
+# ==============================================================================
+# ⚽ BOX TO BOX FC - PIPELINE v1.0
+# Adaptado de Doble Filo Nuclear v4.4.3
+# Solo YouTube · Fútbol · Mundial 2026
+# ==============================================================================
+
+name: "Box to Box FC - Pipeline v1.0"
+
+concurrency:
+  group: render-b2b-unico
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  PYTHONIOENCODING: "utf-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+on:
+  repository_dispatch:
+    types: [render-video]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  render-and-publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    outputs:
+      youtube_status: ${{ steps.youtube.outputs.youtube_status }}
+      video_duration: ${{ steps.audio_gen.outputs.video_duration }}
+      titulo_corto: ${{ steps.extraer.outputs.titulo_corto }}
+
+    steps:
+
+      - name: "📂 Checkout del repositorio"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: "🛠️ Instalar dependencias"
+        timeout-minutes: 15
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -yq --no-install-recommends \
+            ffmpeg fontconfig wget curl
+
+          echo "🔤 Descargando fuente Bebas Neue..."
+          mkdir -p ~/.fonts
+          wget -q --timeout=30 \
+            -O ~/.fonts/BebasNeue.ttf \
+            "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" \
+            && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV \
+            || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf \
+                 ~/.fonts/BebasNeue.ttf 2>/dev/null; \
+                 echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
+          fc-cache -f 2>/dev/null
+
+          python3 -m pip install --quiet --break-system-packages \
+            openai-whisper edge-tts requests gtts \
+            google-auth google-auth-oauthlib google-auth-httplib2 \
+            google-api-python-client numpy tqdm Pillow
+
+          python3 -m pip install --quiet --break-system-packages \
+            torch --index-url https://download.pytorch.org/whl/cpu
+
+          echo "✅ Dependencias instaladas"
+
+      - name: "📝 Extraer y sanear textos"
+        id: extraer
+        timeout-minutes: 2
+        env:
+          TITULO_RAW: ${{ github.event.client_payload.titulo }}
+          DESCRIPCION_RAW: ${{ github.event.client_payload.descripcion }}
+          SCRIPT_RAW: ${{ github.event.client_payload.script_text }}
+        run: |
+          cat << 'PYTHON_EXTRAER' > /tmp/extraer.py
+          import os, sys, re
+          sys.stdout.reconfigure(encoding='utf-8')
+
+          def repair(t):
+              if not t: return ''
+              try: return t.encode('latin-1').decode('utf-8')
+              except: return t
+
+          def clean(t):
+              if not t: return ''
+              t = t.lstrip('\ufeff').replace('\u00a0', ' ')
+              for c in ['\u200b','\u200c','\u200d','\u200e','\u200f','\u2060','\u00ad']:
+                  t = t.replace(c, '')
+              t = t.replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')
+              return re.sub(r' {2,}', ' ', re.sub(r'\n{3,}', '\n\n', t)).strip()
+
+          def sanitize_tts(t):
+              # Elimina símbolos que traban la voz IA
+              t = re.sub(r'[\*\"\'\«\»\(\)\[\]\{\}\#\_\|\~]', '', t)
+              t = re.sub(r'[^\w\s\.,;:\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\-]', '', t)
+              return re.sub(r' {2,}', ' ', t).strip()
+
+          titulo_raw = clean(repair(os.environ.get('TITULO_RAW', '')))
+          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', titulo_raw).strip()[:100] or '⚽ Box to Box FC'
+
+          desc_raw = clean(repair(os.environ.get('DESCRIPCION_RAW', '')))
+          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts'
+
+          script_raw = clean(repair(os.environ.get('SCRIPT_RAW', '')))
+          script_text = script_raw[:5000] or 'Esto cambia el partido. Sigue viendo.'
+          script_audio = sanitize_tts(script_text)
+
+          open('titulo.txt','w',encoding='utf-8').write(titulo)
+          open('descripcion.txt','w',encoding='utf-8').write(descripcion)
+          open('script.txt','w',encoding='utf-8').write(script_text)
+          open('script_audio.txt','w',encoding='utf-8').write(script_audio)
+          open('titulo_corto.txt','w',encoding='utf-8').write(titulo[:50])
+          print(f"✅ Título: {titulo[:70]}")
+          PYTHON_EXTRAER
+
+          python3 /tmp/extraer.py
+          TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")
+          echo "titulo_corto=${TITULO_CORTO}" >> $GITHUB_OUTPUT
+
+      - name: "🎙️ Descargar clips Pexels y generar audio"
+        id: audio_gen
+        timeout-minutes: 12
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
+        run: |
+          cat << 'PYTHON_CLIPS' > /tmp/clips.py
+          import os, requests, sys
+          sys.stdout.reconfigure(encoding='utf-8')
+
+          api_key = os.environ.get('PEXELS_API_KEY', '').strip()
+          query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium world cup'
+
+          # Si la búsqueda viene vacía, fallbacks de fútbol
+          FOOTBALL_FALLBACKS = [
+              'football stadium crowd night',
+              'soccer world cup fans celebration',
+              'football pitch aerial stadium',
+              'soccer ball goal net'
+          ]
+
+          def search_pexels(q):
+              if not api_key: return []
+              try:
+                  res = requests.get(
+                      f"https://api.pexels.com/videos/search?query={q}&orientation=portrait&size=medium&per_page=10",
+                      headers={'Authorization': api_key}, timeout=15
+                  ).json()
+                  links = []
+                  for v in res.get('videos', []):
+                      files = sorted(v['video_files'], key=lambda x: x['width']*x['height'], reverse=True)
+                      for f in files:
+                          if f['width'] <= f['height'] and f.get('link'):
+                              links.append(f['link']); break
+                  return links
+              except: return []
+
+          links = search_pexels(query)
+          if not links:
+              for fb in FOOTBALL_FALLBACKS:
+                  links = search_pexels(fb)
+                  if links: break
+
+          downloaded = []
+          for i, link in enumerate(links[:4]):
+              try:
+                  r = requests.get(link, timeout=30)
+                  if r.status_code == 200:
+                      with open(f'clip_{i}.mp4','wb') as f: f.write(r.content)
+                      downloaded.append(f'clip_{i}.mp4')
+              except: pass
+              if len(downloaded) >= 4: break
+
+          if not downloaded:
+              print("⚠️ Sin clips Pexels. Fondo oscuro de emergencia.")
+              os.system('ffmpeg -y -f lavfi -i "color=c=#0A0A0A:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
+          else:
+              with open('concat_list.txt','w') as f:
+                  for i, clip in enumerate(downloaded):
+                      out = f'norm_{i}.mp4'
+                      os.system(f'ffmpeg -y -i {clip} -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -an {out} 2>/dev/null')
+                      f.write(f"file '{out}'\n")
+              os.system('ffmpeg -y -f concat -safe 0 -i concat_list.txt -c copy pexels.mp4 2>/dev/null')
+          print(f"✅ Clips listos: {len(downloaded)}")
+          PYTHON_CLIPS
+
+          python3 /tmp/clips.py
+
+          # ── Generar audio con Edge TTS ─────────────────────────────────────
+          AUDIO_OK=false
+
+          # Voz 1: Español neutro (MX, ideal LATAM)
+          edge-tts --voice "es-MX-JorgeNeural" --rate="+8%" --pitch="-2Hz" \
+            --file script_audio.txt --write-media audio_v1.mp3 2>/dev/null || true
+          if [ "$(stat -c%s audio_v1.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then
+            cp audio_v1.mp3 audio.mp3; AUDIO_OK=true
+            echo "🎙️ Voz: JorgeNeural (MX)"
+          fi
+
+          # Voz 2: Español peninsular (fallback)
+          if [ "$AUDIO_OK" = "false" ]; then
+            edge-tts --voice "es-ES-AlvaroNeural" --rate="+5%" --pitch="-3Hz" \
+              --file script_audio.txt --write-media audio_v2.mp3 2>/dev/null || true
+            if [ "$(stat -c%s audio_v2.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then
+              cp audio_v2.mp3 audio.mp3; AUDIO_OK=true
+              echo "🎙️ Voz: AlvaroNeural (ES)"
+            fi
+          fi
+
+          # Voz 3: gTTS como último recurso
+          if [ "$AUDIO_OK" = "false" ]; then
+            python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio.mp3')" 2>/dev/null || true
+            echo "🎙️ Voz: gTTS (fallback)"
+          fi
+
+          ffmpeg -y -i audio.mp3 -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null
+
+          if [ ! -s "audio.wav" ]; then echo "❌ Audio fallido"; exit 1; fi
+
+          DURACION=$(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 audio.wav 2>/dev/null || echo "30")
+          # Shorts: máximo 60 segundos
+          DURACION_FINAL=$(python3 -c "print(f'{max(10,min(60,float(\"$DURACION\"))):.2f}')")
+          echo "$DURACION_FINAL" > dur.txt
+          echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
+          echo "⏱️ Duración: ${DURACION_FINAL}s"
+
+      - name: "💬 Generar subtítulos animados (Whisper)"
+        timeout-minutes: 15
+        run: |
+          # Transcripción con Whisper small (suficiente para 60s de audio)
+          python3 -c "
+          import whisper, json, sys
+          sys.stdout.reconfigure(encoding='utf-8')
+          model = whisper.load_model('small')
+          result = model.transcribe(
+              'audio.wav', language='es',
+              word_timestamps=True, temperature=0.0,
+              initial_prompt='Vídeo de análisis de fútbol y Mundial 2026 en español.'
+          )
+          json.dump(result, open('audio.json','w',encoding='utf-8'), ensure_ascii=False)
+          print(f\"✅ Whisper: {len(result.get('segments',[]))} segmentos\")
+          " 2>/dev/null || true
+
+          # Fallback si Whisper falla
+          if [ ! -s "audio.json" ]; then
+            python3 -c "
+          import json
+          t=open('script.txt',encoding='utf-8').read().strip().split()
+          d=float(open('dur.txt').read().strip())
+          tpw=d/max(len(t),1)
+          json.dump({'segments':[{'start':i*tpw,'end':(i+1)*tpw,'words':[{'word':w,'start':i*tpw,'end':(i+1)*tpw}]}for i,w in enumerate(t)]},open('audio.json','w',encoding='utf-8'))
+          "
+            echo "⚠️ Usando subtítulos de fallback"
+          fi
+
+          cat << 'PYTHON_ASS' > /tmp/gen_ass.py
+          import json, os, sys, re
+          sys.stdout.reconfigure(encoding='utf-8')
+
+          font_name = os.environ.get('FONT_NAME', 'Bebas Neue')
+
+          def fmt(s):
+              s = max(0.0, s)
+              return f"{int(s//3600)}:{int((s%3600)//60):02d}:{int(s%60):02d}.{min(int(round((s%1)*100)),99):02d}"
+
+          def clean(t):
+              return re.sub(r' {2,}',' ',t.replace('{','').replace('}','').replace('\\','').replace('\n',' ')).strip()
+
+          # Detectar palabras clave con *asteriscos* → texto en dorado
+          try:
+              original = open('script.txt', encoding='utf-8').read()
+              gold_words = set(re.sub(r'[^\w\s]','',w.strip('*')).upper()
+                               for w in original.split()
+                               if w.startswith('*') and w.endswith('*') and len(w) > 2)
+          except:
+              gold_words = set()
+
+          data = json.load(open('audio.json','r',encoding='utf-8'))
+          all_words = [
+              {'word': clean(w.get('word','')), 'start': w.get('start',0.0), 'end': w.get('end',0.0)}
+              for s in data.get('segments',[])
+              for w in s.get('words',[])
+              if w.get('word','').strip() and w.get('end',0) > w.get('start',0)
+          ]
+
+          header = f"""[Script Info]
+          ScriptType: v4.00+
+          WrapStyle: 0
+          ScaledBorderAndShadow: yes
+          PlayResX: 1080
+          PlayResY: 1920
+
+          [V4+ Styles]
+          Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+          Style: Default,{font_name},108,&H00FFFFFF,&H00FFFFFF,&H00000000,&H99000000,-1,0,0,0,100,100,0,0,3,9,0,5,40,40,255,1
+
+          [Events]
+          Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+          """.replace('          ','')
+
+          chunks, cur, chars = [], [], 0
+          for i, w in enumerate(all_words):
+              w_upper = w['word'].upper().strip()
+              clean_w = re.sub(r'[^\w\s]','',w_upper)
+              # Dorado para palabras clave, blanco para el resto
+              if clean_w in gold_words and clean_w:
+                  w_text = f"{{\\c&H0000D7FF&}}{w_upper}{{\\c&H00FFFFFF&}}"
+              else:
+                  w_text = w_upper
+              cur.append({'text': w_text, 'start': w['start'], 'end': w['end']})
+              chars += len(re.sub(r'\{.*?\}','',w_text))
+              if len(cur) >= 2 or chars > 12 or i == len(all_words)-1:
+                  chunks.append({'text':' '.join(x['text'] for x in cur),'start':cur[0]['start'],'end':cur[-1]['end']})
+                  cur, chars = [], 0
+
+          lines = []
+          for i, c in enumerate(chunks):
+              end = chunks[i+1]['start'] if i < len(chunks)-1 else c['end']+0.1
+              if c['start'] < end:
+                  anim = r'{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}'
+                  lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{anim}{c['text']}")
+
+          open('subtitles.ass','w',encoding='utf-8').write(header+'\n'+'\n'.join(lines))
+          print(f"✅ Subtítulos: {len(lines)} líneas generadas")
+          PYTHON_ASS
+
+          FONT_NAME=$FONT_NAME python3 /tmp/gen_ass.py
+
+      - name: "🎬 Renderizar vídeo Box to Box FC"
+        timeout-minutes: 20
+        run: |
+          DUR=$(cat dur.txt)
+          ASS_PATH=$(realpath subtitles.ass)
+          ASS_ESC=$(echo "$ASS_PATH" | sed 's/:/\\:/g')
+
+          # Generar logo si no existe en el repo
+          if [ ! -f "logo.png" ]; then
+            python3 -c "
+          from PIL import Image, ImageDraw, ImageFont
+          import os
+          img = Image.new('RGBA',(320,72),(0,0,0,0))
+          draw = ImageDraw.Draw(img)
+          draw.rectangle([0,0,320,72],fill=(10,10,10,200))
+          try:
+              font = ImageFont.truetype(os.path.expanduser('~/.fonts/BebasNeue.ttf'),46)
+              draw.text((12,12),'BOX TO BOX FC',font=font,fill='#FFD700')
+          except:
+              draw.text((12,20),'BOX TO BOX FC',fill='#FFD700')
+          img.save('logo.png')
+          " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
+          fi
+
+          ffmpeg -y \
+            -stream_loop -1 -i pexels.mp4 \
+            -i audio.wav \
+            -i logo.png \
+            -filter_complex "
+              [0:v]scale=1080:1920:force_original_aspect_ratio=increase,
+              crop=1080:1920,setsar=1,
+              zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920,
+              eq=brightness=-0.06:saturation=1.2:contrast=1.05[bg];
+              [2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];
+              [bg][logo]overlay=W-w-35:H-h-35[bg_logo];
+              [bg_logo]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];
+              [vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]
+            " \
+            -map "[outv]" -map 1:a \
+            -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 \
+            -c:a aac -b:a 192k \
+            -t "$DUR" \
+            -movflags +faststart \
+            output.mp4 \
+            2>&1 | tee ffmpeg.log | tail -5
+
+          if [ ! -f "output.mp4" ] || [ "$(stat -c%s output.mp4)" -lt 100000 ]; then
+            echo "❌ FFmpeg generó archivo inválido"
+            cat ffmpeg.log | tail -30
+            exit 1
+          fi
+          echo "✅ Vídeo renderizado: $(numfmt --to=iec $(stat -c%s output.mp4))"
+
+      - name: "📺 Publicar en YouTube"
+        id: youtube
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          cat << 'PYTHON_YT' > /tmp/subir_yt.py
+          import os, sys, traceback
+          from google.auth.transport.requests import Request
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+          from googleapiclient.errors import HttpError
+          sys.stdout.reconfigure(encoding='utf-8')
+
+          try:
+              creds = Credentials.from_authorized_user_info({
+                  'client_id': os.environ['YOUTUBE_CLIENT_ID'],
+                  'client_secret': os.environ['YOUTUBE_CLIENT_SECRET'],
+                  'refresh_token': os.environ['YOUTUBE_REFRESH_TOKEN'],
+                  'token_uri': 'https://oauth2.googleapis.com/token',
+                  'scopes': ['https://www.googleapis.com/auth/youtube.upload']
+              })
+              creds.refresh(Request())
+              yt = build('youtube', 'v3', credentials=creds)
+
+              titulo = open('titulo.txt','r',encoding='utf-8').read().strip()[:100]
+              desc = open('descripcion.txt','r',encoding='utf-8').read().strip()[:5000]
+
+              body = {
+                  'snippet': {
+                      'title': titulo,
+                      'description': desc,
+                      'tags': [
+                          'mundialdefutbol','mundial2026','futbol','shorts',
+                          'futbolshorts','worldcup2026','boxtoboxfc',
+                          'prediccion','analisis','deporte','fifaworldcup',
+                          'futbol2026','golazo','partidofutbol'
+                      ],
+                      'categoryId': '17',  # Sports
+                      'defaultLanguage': 'es',
+                      'defaultAudioLanguage': 'es'
+                  },
+                  'status': {
+                      'privacyStatus': 'public',
+                      'selfDeclaredMadeForKids': False,
+                      'madeForKids': False
+                  }
+              }
+
+              media = MediaFileUpload('output.mp4', mimetype='video/mp4', resumable=True, chunksize=50*1024*1024)
+              req = yt.videos().insert(part='snippet,status', body=body, media_body=media)
+
+              resp = None
+              while resp is None:
+                  status, resp = req.next_chunk()
+                  if status:
+                      print(f"   📤 {int(status.progress()*100)}%")
+
+              video_id = resp['id']
+              url = f"https://youtube.com/shorts/{video_id}"
+              print(f"✅ PUBLICADO: {url}")
+              open('video_id.txt','w').write(video_id)
+              open('video_url.txt','w').write(url)
+
+          except HttpError as e:
+              print(f"❌ YouTube API {e.resp.status}: {e.content.decode()}")
+              sys.exit(1)
+          except Exception:
+              traceback.print_exc()
+              sys.exit(1)
+          PYTHON_YT
+
+          if python3 /tmp/subir_yt.py; then
+            echo "youtube_status=✅ YouTube OK" >> $GITHUB_OUTPUT
+          else
+            echo "youtube_status=❌ YouTube Falló" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "📦 Guardar artifacts de diagnóstico"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "b2b-run-${{ github.run_number }}"
+          path: |
+            output.mp4
+            subtitles.ass
+            titulo.txt
+            script.txt
+            ffmpeg.log
+          retention-days: 3
+          if-no-files-found: warn
+
+      - name: "📲 Notificar por Telegram"
+        if: always()
+        timeout-minutes: 2
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TITULO=$(python3 -c "print(open('titulo.txt',encoding='utf-8').read().strip()[:60])" 2>/dev/null || echo "Box to Box FC")
+          DUR=$(python3 -c "import sys; d=float(open('dur.txt').read()); print(f'{int(d)}s')" 2>/dev/null || echo "?")
+          URL=$(cat video_url.txt 2>/dev/null || echo "")
+          YT="${{ steps.youtube.outputs.youtube_status || '❌ Error' }}"
+
+          MSG="⚽ *Box to Box FC*
+          %0A📹 ${TITULO}
+          %0A⏱️ ${DUR}
+          %0A%0A▶️ ${YT}
+          %0A🔗 ${URL}"
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=Markdown" \
+            -d "disable_web_page_preview=true" 2>/dev/null
+          echo "📱 Notificación Telegram enviada"
