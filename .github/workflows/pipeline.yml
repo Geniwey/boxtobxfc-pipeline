@@ -62,12 +62,20 @@ jobs:
                  echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
           fc-cache -f 2>/dev/null
 
-          python3 -m pip install --quiet --break-system-packages \
+          python3 -m pip install --quiet \
+            openai-whisper edge-tts requests gtts \
+            google-auth google-auth-oauthlib google-auth-httplib2 \
+            google-api-python-client numpy tqdm Pillow \
+            --break-system-packages 2>/dev/null || \
+          python3 -m pip install --quiet \
             openai-whisper edge-tts requests gtts \
             google-auth google-auth-oauthlib google-auth-httplib2 \
             google-api-python-client numpy tqdm Pillow
 
-          python3 -m pip install --quiet --break-system-packages \
+          python3 -m pip install --quiet \
+            torch --index-url https://download.pytorch.org/whl/cpu \
+            --break-system-packages 2>/dev/null || \
+          python3 -m pip install --quiet \
             torch --index-url https://download.pytorch.org/whl/cpu
 
           echo "✅ Dependencias instaladas"
@@ -426,7 +434,7 @@ jobs:
               while resp is None:
                   status, resp = req.next_chunk()
                   if status:
-                      print(f"   📤 {int(status.progress()*100)}%")
+                      print(f"    📤 {int(status.progress()*100)}%")
 
               video_id = resp['id']
               print(f"✅ PUBLICADO: https://youtube.com/shorts/{video_id}")
