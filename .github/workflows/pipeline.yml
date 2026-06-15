@@ -1,10 +1,11 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v1.0
+# ⚽ BOX TO BOX FC - PIPELINE v1.1 FINAL
 # Adaptado de Doble Filo Nuclear v4.4.3
 # Solo YouTube · Fútbol · Mundial 2026
+# Sin Telegram · Predicciones táticas
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v1.0"
+name: "Box to Box FC - Pipeline v1.1"
 
 concurrency:
   group: render-b2b-unico
@@ -97,7 +98,6 @@ jobs:
               return re.sub(r' {2,}', ' ', re.sub(r'\n{3,}', '\n\n', t)).strip()
 
           def sanitize_tts(t):
-              # Elimina símbolos que traban la voz IA
               t = re.sub(r'[\*\"\'\«\»\(\)\[\]\{\}\#\_\|\~]', '', t)
               t = re.sub(r'[^\w\s\.,;:\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\-]', '', t)
               return re.sub(r' {2,}', ' ', t).strip()
@@ -106,10 +106,10 @@ jobs:
           titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', titulo_raw).strip()[:100] or '⚽ Box to Box FC'
 
           desc_raw = clean(repair(os.environ.get('DESCRIPCION_RAW', '')))
-          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts'
+          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts #BoxToBoxFC'
 
           script_raw = clean(repair(os.environ.get('SCRIPT_RAW', '')))
-          script_text = script_raw[:5000] or 'Esto cambia el partido. Sigue viendo.'
+          script_text = script_raw[:5000] or 'El dato que nadie esperaba. Sigue viendo.'
           script_audio = sanitize_tts(script_text)
 
           open('titulo.txt','w',encoding='utf-8').write(titulo)
@@ -138,12 +138,11 @@ jobs:
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
           query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium world cup'
 
-          # Si la búsqueda viene vacía, fallbacks de fútbol
           FOOTBALL_FALLBACKS = [
               'football stadium crowd night',
               'soccer world cup fans celebration',
               'football pitch aerial stadium',
-              'soccer ball goal net'
+              'soccer ball goal net slow motion'
           ]
 
           def search_pexels(q):
@@ -179,7 +178,7 @@ jobs:
               if len(downloaded) >= 4: break
 
           if not downloaded:
-              print("⚠️ Sin clips Pexels. Fondo oscuro de emergencia.")
+              print("⚠️ Sin clips Pexels. Generando fondo oscuro de emergencia.")
               os.system('ffmpeg -y -f lavfi -i "color=c=#0A0A0A:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
           else:
               with open('concat_list.txt','w') as f:
@@ -193,10 +192,8 @@ jobs:
 
           python3 /tmp/clips.py
 
-          # ── Generar audio con Edge TTS ─────────────────────────────────────
           AUDIO_OK=false
 
-          # Voz 1: Español neutro (MX, ideal LATAM)
           edge-tts --voice "es-MX-JorgeNeural" --rate="+8%" --pitch="-2Hz" \
             --file script_audio.txt --write-media audio_v1.mp3 2>/dev/null || true
           if [ "$(stat -c%s audio_v1.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then
@@ -204,7 +201,6 @@ jobs:
             echo "🎙️ Voz: JorgeNeural (MX)"
           fi
 
-          # Voz 2: Español peninsular (fallback)
           if [ "$AUDIO_OK" = "false" ]; then
             edge-tts --voice "es-ES-AlvaroNeural" --rate="+5%" --pitch="-3Hz" \
               --file script_audio.txt --write-media audio_v2.mp3 2>/dev/null || true
@@ -214,7 +210,6 @@ jobs:
             fi
           fi
 
-          # Voz 3: gTTS como último recurso
           if [ "$AUDIO_OK" = "false" ]; then
             python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio.mp3')" 2>/dev/null || true
             echo "🎙️ Voz: gTTS (fallback)"
@@ -225,7 +220,6 @@ jobs:
           if [ ! -s "audio.wav" ]; then echo "❌ Audio fallido"; exit 1; fi
 
           DURACION=$(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 audio.wav 2>/dev/null || echo "30")
-          # Shorts: máximo 60 segundos
           DURACION_FINAL=$(python3 -c "print(f'{max(10,min(60,float(\"$DURACION\"))):.2f}')")
           echo "$DURACION_FINAL" > dur.txt
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
@@ -234,7 +228,6 @@ jobs:
       - name: "💬 Generar subtítulos animados (Whisper)"
         timeout-minutes: 15
         run: |
-          # Transcripción con Whisper small (suficiente para 60s de audio)
           python3 -c "
           import whisper, json, sys
           sys.stdout.reconfigure(encoding='utf-8')
@@ -242,13 +235,12 @@ jobs:
           result = model.transcribe(
               'audio.wav', language='es',
               word_timestamps=True, temperature=0.0,
-              initial_prompt='Vídeo de análisis de fútbol y Mundial 2026 en español.'
+              initial_prompt='Análisis táctico y predicciones del Mundial de Fútbol 2026.'
           )
           json.dump(result, open('audio.json','w',encoding='utf-8'), ensure_ascii=False)
           print(f\"✅ Whisper: {len(result.get('segments',[]))} segmentos\")
           " 2>/dev/null || true
 
-          # Fallback si Whisper falla
           if [ ! -s "audio.json" ]; then
             python3 -c "
           import json
@@ -257,7 +249,7 @@ jobs:
           tpw=d/max(len(t),1)
           json.dump({'segments':[{'start':i*tpw,'end':(i+1)*tpw,'words':[{'word':w,'start':i*tpw,'end':(i+1)*tpw}]}for i,w in enumerate(t)]},open('audio.json','w',encoding='utf-8'))
           "
-            echo "⚠️ Usando subtítulos de fallback"
+            echo "⚠️ Subtítulos fallback activados"
           fi
 
           cat << 'PYTHON_ASS' > /tmp/gen_ass.py
@@ -273,7 +265,6 @@ jobs:
           def clean(t):
               return re.sub(r' {2,}',' ',t.replace('{','').replace('}','').replace('\\','').replace('\n',' ')).strip()
 
-          # Detectar palabras clave con *asteriscos* → texto en dorado
           try:
               original = open('script.txt', encoding='utf-8').read()
               gold_words = set(re.sub(r'[^\w\s]','',w.strip('*')).upper()
@@ -309,7 +300,6 @@ jobs:
           for i, w in enumerate(all_words):
               w_upper = w['word'].upper().strip()
               clean_w = re.sub(r'[^\w\s]','',w_upper)
-              # Dorado para palabras clave, blanco para el resto
               if clean_w in gold_words and clean_w:
                   w_text = f"{{\\c&H0000D7FF&}}{w_upper}{{\\c&H00FFFFFF&}}"
               else:
@@ -328,7 +318,7 @@ jobs:
                   lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{anim}{c['text']}")
 
           open('subtitles.ass','w',encoding='utf-8').write(header+'\n'+'\n'.join(lines))
-          print(f"✅ Subtítulos: {len(lines)} líneas generadas")
+          print(f"✅ Subtítulos: {len(lines)} líneas")
           PYTHON_ASS
 
           FONT_NAME=$FONT_NAME python3 /tmp/gen_ass.py
@@ -340,7 +330,6 @@ jobs:
           ASS_PATH=$(realpath subtitles.ass)
           ASS_ESC=$(echo "$ASS_PATH" | sed 's/:/\\:/g')
 
-          # Generar logo si no existe en el repo
           if [ ! -f "logo.png" ]; then
             python3 -c "
           from PIL import Image, ImageDraw, ImageFont
@@ -361,16 +350,7 @@ jobs:
             -stream_loop -1 -i pexels.mp4 \
             -i audio.wav \
             -i logo.png \
-            -filter_complex "
-              [0:v]scale=1080:1920:force_original_aspect_ratio=increase,
-              crop=1080:1920,setsar=1,
-              zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920,
-              eq=brightness=-0.06:saturation=1.2:contrast=1.05[bg];
-              [2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];
-              [bg][logo]overlay=W-w-35:H-h-35[bg_logo];
-              [bg_logo]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];
-              [vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]
-            " \
+            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920,eq=brightness=-0.06:saturation=1.2:contrast=1.05[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
             -map "[outv]" -map 1:a \
             -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 \
             -c:a aac -b:a 192k \
@@ -384,7 +364,7 @@ jobs:
             cat ffmpeg.log | tail -30
             exit 1
           fi
-          echo "✅ Vídeo renderizado: $(numfmt --to=iec $(stat -c%s output.mp4))"
+          echo "✅ Vídeo renderizado: $(du -sh output.mp4 | cut -f1)"
 
       - name: "📺 Publicar en YouTube"
         id: youtube
@@ -425,10 +405,10 @@ jobs:
                       'tags': [
                           'mundialdefutbol','mundial2026','futbol','shorts',
                           'futbolshorts','worldcup2026','boxtoboxfc',
-                          'prediccion','analisis','deporte','fifaworldcup',
-                          'futbol2026','golazo','partidofutbol'
+                          'prediccion','pronostico','analisis','tactica',
+                          'deporte','fifaworldcup','futbol2026'
                       ],
-                      'categoryId': '17',  # Sports
+                      'categoryId': '17',
                       'defaultLanguage': 'es',
                       'defaultAudioLanguage': 'es'
                   },
@@ -449,10 +429,8 @@ jobs:
                       print(f"   📤 {int(status.progress()*100)}%")
 
               video_id = resp['id']
-              url = f"https://youtube.com/shorts/{video_id}"
-              print(f"✅ PUBLICADO: {url}")
+              print(f"✅ PUBLICADO: https://youtube.com/shorts/{video_id}")
               open('video_id.txt','w').write(video_id)
-              open('video_url.txt','w').write(url)
 
           except HttpError as e:
               print(f"❌ YouTube API {e.resp.status}: {e.content.decode()}")
@@ -468,7 +446,7 @@ jobs:
             echo "youtube_status=❌ YouTube Falló" >> $GITHUB_OUTPUT
           fi
 
-      - name: "📦 Guardar artifacts de diagnóstico"
+      - name: "📦 Artifacts de diagnóstico"
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -481,28 +459,3 @@ jobs:
             ffmpeg.log
           retention-days: 3
           if-no-files-found: warn
-
-      - name: "📲 Notificar por Telegram"
-        if: always()
-        timeout-minutes: 2
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          TITULO=$(python3 -c "print(open('titulo.txt',encoding='utf-8').read().strip()[:60])" 2>/dev/null || echo "Box to Box FC")
-          DUR=$(python3 -c "import sys; d=float(open('dur.txt').read()); print(f'{int(d)}s')" 2>/dev/null || echo "?")
-          URL=$(cat video_url.txt 2>/dev/null || echo "")
-          YT="${{ steps.youtube.outputs.youtube_status || '❌ Error' }}"
-
-          MSG="⚽ *Box to Box FC*
-          %0A📹 ${TITULO}
-          %0A⏱️ ${DUR}
-          %0A%0A▶️ ${YT}
-          %0A🔗 ${URL}"
-
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            -d "text=${MSG}" \
-            -d "parse_mode=Markdown" \
-            -d "disable_web_page_preview=true" 2>/dev/null
-          echo "📱 Notificación Telegram enviada"
