@@ -1,11 +1,9 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v1.1 FINAL
-# Adaptado de Doble Filo Nuclear v4.4.3
-# Solo YouTube · Fútbol · Mundial 2026
-# Sin Telegram · Predicciones táticas
+# ⚽ BOX TO BOX FC - PIPELINE v2.0
+# Añade: rotacion de voz, rotacion de estilo visual, gancho instantaneo seg.0
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v1.1"
+name: "Box to Box FC - Pipeline v2.0"
 
 concurrency:
   group: render-b2b-unico
@@ -42,7 +40,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: "🛠️ Instalar dependencias"
+      - name: "🛠️ Instalar dependencias + elegir estilo del vídeo"
         timeout-minutes: 15
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -80,6 +78,23 @@ jobs:
 
           echo "✅ Dependencias instaladas"
 
+          # ── Elegir estilo visual al azar (0=dorado, 1=cian, 2=coral) ──────
+          STYLE_INDEX=$((RANDOM % 3))
+          echo "STYLE_INDEX=$STYLE_INDEX" >> $GITHUB_ENV
+          if [ "$STYLE_INDEX" = "0" ]; then
+            echo "HIGHLIGHT_ASS_COLOR=&H0000D7FF&" >> $GITHUB_ENV
+            echo "BAR_COLOR_HEX=0xFFD700" >> $GITHUB_ENV
+            echo "🎨 Estilo: DORADO"
+          elif [ "$STYLE_INDEX" = "1" ]; then
+            echo "HIGHLIGHT_ASS_COLOR=&H00FFE500&" >> $GITHUB_ENV
+            echo "BAR_COLOR_HEX=0x00E5FF" >> $GITHUB_ENV
+            echo "🎨 Estilo: CIAN"
+          else
+            echo "HIGHLIGHT_ASS_COLOR=&H000045FF&" >> $GITHUB_ENV
+            echo "BAR_COLOR_HEX=0xFF4500" >> $GITHUB_ENV
+            echo "🎨 Estilo: CORAL"
+          fi
+
       - name: "📝 Extraer y sanear textos"
         id: extraer
         timeout-minutes: 2
@@ -89,7 +104,7 @@ jobs:
           SCRIPT_RAW: ${{ github.event.client_payload.script_text }}
         run: |
           cat << 'PYTHON_EXTRAER' > /tmp/extraer.py
-          import os, sys, re
+          import os, sys, re, textwrap
           sys.stdout.reconfigure(encoding='utf-8')
 
           def repair(t):
@@ -125,6 +140,12 @@ jobs:
           open('script.txt','w',encoding='utf-8').write(script_text)
           open('script_audio.txt','w',encoding='utf-8').write(script_audio)
           open('titulo_corto.txt','w',encoding='utf-8').write(titulo[:50])
+
+          # Texto del gancho instantaneo (titulo envuelto en 2 lineas, sin emoji raros)
+          hook_clean = re.sub(r'[\*\"\'\«\»]', '', titulo).strip()
+          wrapped = textwrap.fill(hook_clean, width=22, max_lines=3, placeholder='')
+          open('hook_text.txt','w',encoding='utf-8').write(wrapped)
+
           print(f"✅ Título: {titulo[:70]}")
           PYTHON_EXTRAER
 
@@ -132,7 +153,7 @@ jobs:
           TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")
           echo "titulo_corto=${TITULO_CORTO}" >> $GITHUB_OUTPUT
 
-      - name: "🎙️ Descargar clips Pexels y generar audio"
+      - name: "🎙️ Descargar clips Pexels y generar audio (voz rotativa)"
         id: audio_gen
         timeout-minutes: 12
         env:
@@ -157,7 +178,7 @@ jobs:
               if not api_key: return []
               try:
                   res = requests.get(
-                      f"https://api.pexels.com/videos/search?query={q}&orientation=portrait&size=medium&per_page=10",
+                      f"https://api.pexels.com/videos/search?query={q}&orientation=portrait&size=medium&per_page=15",
                       headers={'Authorization': api_key}, timeout=15
                   ).json()
                   links = []
@@ -175,6 +196,10 @@ jobs:
                   links = search_pexels(fb)
                   if links: break
 
+          # Variedad: en vez de los primeros 4, baraja antes de elegir
+          import random
+          random.shuffle(links)
+
           downloaded = []
           for i, link in enumerate(links[:4]):
               try:
@@ -186,7 +211,7 @@ jobs:
               if len(downloaded) >= 4: break
 
           if not downloaded:
-              print("⚠️ Sin clips Pexels. Generando fondo oscuro de emergencia.")
+              print("⚠️ Sin clips Pexels. Fondo oscuro de emergencia.")
               os.system('ffmpeg -y -f lavfi -i "color=c=#0A0A0A:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
           else:
               with open('concat_list.txt','w') as f:
@@ -200,13 +225,16 @@ jobs:
 
           python3 /tmp/clips.py
 
-          AUDIO_OK=false
+          # ── Rotacion de voz: una distinta cada vez, no siempre la misma ───
+          VOCES=("es-MX-JorgeNeural" "es-ES-AlvaroNeural" "es-AR-TomasNeural" "es-CO-GonzaloNeural" "es-US-AlonsoNeural")
+          VOZ_ELEGIDA=${VOCES[$RANDOM % ${#VOCES[@]}]}
+          echo "🎙️ Voz elegida: $VOZ_ELEGIDA"
 
-          edge-tts --voice "es-MX-JorgeNeural" --rate="+8%" --pitch="-2Hz" \
+          AUDIO_OK=false
+          edge-tts --voice "$VOZ_ELEGIDA" --rate="+8%" --pitch="-2Hz" \
             --file script_audio.txt --write-media audio_v1.mp3 2>/dev/null || true
           if [ "$(stat -c%s audio_v1.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then
             cp audio_v1.mp3 audio.mp3; AUDIO_OK=true
-            echo "🎙️ Voz: JorgeNeural (MX)"
           fi
 
           if [ "$AUDIO_OK" = "false" ]; then
@@ -214,13 +242,13 @@ jobs:
               --file script_audio.txt --write-media audio_v2.mp3 2>/dev/null || true
             if [ "$(stat -c%s audio_v2.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then
               cp audio_v2.mp3 audio.mp3; AUDIO_OK=true
-              echo "🎙️ Voz: AlvaroNeural (ES)"
+              echo "🎙️ Fallback: AlvaroNeural"
             fi
           fi
 
           if [ "$AUDIO_OK" = "false" ]; then
             python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio.mp3')" 2>/dev/null || true
-            echo "🎙️ Voz: gTTS (fallback)"
+            echo "🎙️ Fallback: gTTS"
           fi
 
           ffmpeg -y -i audio.mp3 -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null
@@ -265,6 +293,7 @@ jobs:
           sys.stdout.reconfigure(encoding='utf-8')
 
           font_name = os.environ.get('FONT_NAME', 'Bebas Neue')
+          highlight_color = os.environ.get('HIGHLIGHT_ASS_COLOR', '&H0000D7FF&')
 
           def fmt(s):
               s = max(0.0, s)
@@ -309,7 +338,7 @@ jobs:
               w_upper = w['word'].upper().strip()
               clean_w = re.sub(r'[^\w\s]','',w_upper)
               if clean_w in gold_words and clean_w:
-                  w_text = f"{{\\c&H0000D7FF&}}{w_upper}{{\\c&H00FFFFFF&}}"
+                  w_text = f"{{\\c{highlight_color}}}{w_upper}{{\\c&H00FFFFFF&}}"
               else:
                   w_text = w_upper
               cur.append({'text': w_text, 'start': w['start'], 'end': w['end']})
@@ -329,7 +358,7 @@ jobs:
           print(f"✅ Subtítulos: {len(lines)} líneas")
           PYTHON_ASS
 
-          FONT_NAME=$FONT_NAME python3 /tmp/gen_ass.py
+          FONT_NAME=$FONT_NAME HIGHLIGHT_ASS_COLOR=$HIGHLIGHT_ASS_COLOR python3 /tmp/gen_ass.py
 
       - name: "🎬 Renderizar vídeo Box to Box FC"
         timeout-minutes: 20
@@ -337,6 +366,8 @@ jobs:
           DUR=$(cat dur.txt)
           ASS_PATH=$(realpath subtitles.ass)
           ASS_ESC=$(echo "$ASS_PATH" | sed 's/:/\\:/g')
+          HOOK_PATH=$(realpath hook_text.txt)
+          HOOK_ESC=$(echo "$HOOK_PATH" | sed 's/:/\\:/g')
 
           if [ ! -f "logo.png" ]; then
             python3 -c "
@@ -358,7 +389,7 @@ jobs:
             -stream_loop -1 -i pexels.mp4 \
             -i audio.wav \
             -i logo.png \
-            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920,eq=brightness=-0.06:saturation=1.2:contrast=1.05[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
+            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920,eq=brightness=-0.06:saturation=1.2:contrast=1.05[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2-300:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=${BAR_COLOR_HEX}@0.95:t=fill[outv]" \
             -map "[outv]" -map 1:a \
             -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 \
             -c:a aac -b:a 192k \
@@ -434,7 +465,7 @@ jobs:
               while resp is None:
                   status, resp = req.next_chunk()
                   if status:
-                      print(f"    📤 {int(status.progress()*100)}%")
+                      print(f"   📤 {int(status.progress()*100)}%")
 
               video_id = resp['id']
               print(f"✅ PUBLICADO: https://youtube.com/shorts/{video_id}")
@@ -462,6 +493,7 @@ jobs:
           path: |
             output.mp4
             subtitles.ass
+            hook_text.txt
             titulo.txt
             script.txt
             ffmpeg.log
