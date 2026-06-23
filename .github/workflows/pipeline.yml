@@ -405,17 +405,32 @@ jobs:
           fi
           echo "✅ Vídeo renderizado: $(du -sh output.mp4 | cut -f1)"
 
-      - name: "📺 Publicar en YouTube"
+      - name: "📺 Publicar en YouTube (rotacion 4 proyectos)"
         id: youtube
         continue-on-error: true
         timeout-minutes: 10
         env:
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          # AQUI ESTA LA MAGIA: Mapeamos la variable _1 para que tire del secreto ORIGINAL
+          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          
+          # Los demas proyectos siguen su curso con sus sufijos normales
+          YOUTUBE_CLIENT_ID_2: ${{ secrets.YOUTUBE_CLIENT_ID_2 }}
+          YOUTUBE_CLIENT_SECRET_2: ${{ secrets.YOUTUBE_CLIENT_SECRET_2 }}
+          YOUTUBE_REFRESH_TOKEN_2: ${{ secrets.YOUTUBE_REFRESH_TOKEN_2 }}
+          
+          YOUTUBE_CLIENT_ID_3: ${{ secrets.YOUTUBE_CLIENT_ID_3 }}
+          YOUTUBE_CLIENT_SECRET_3: ${{ secrets.YOUTUBE_CLIENT_SECRET_3 }}
+          YOUTUBE_REFRESH_TOKEN_3: ${{ secrets.YOUTUBE_REFRESH_TOKEN_3 }}
+          
+          YOUTUBE_CLIENT_ID_4: ${{ secrets.YOUTUBE_CLIENT_ID_4 }}
+          YOUTUBE_CLIENT_SECRET_4: ${{ secrets.YOUTUBE_CLIENT_SECRET_4 }}
+          YOUTUBE_REFRESH_TOKEN_4: ${{ secrets.YOUTUBE_REFRESH_TOKEN_4 }}
         run: |
           cat << 'PYTHON_YT' > /tmp/subir_yt.py
           import os, sys, traceback
+          from datetime import datetime, timezone
           from google.auth.transport.requests import Request
           from google.oauth2.credentials import Credentials
           from googleapiclient.discovery import build
@@ -424,10 +439,14 @@ jobs:
           sys.stdout.reconfigure(encoding='utf-8')
 
           try:
+              hora_actual = datetime.now(timezone.utc).hour
+              proyecto_idx = (hora_actual % 4) + 1
+              print(f"Hora UTC: {hora_actual} -> Usando proyecto {proyecto_idx} de 4")
+
               creds = Credentials.from_authorized_user_info({
-                  'client_id': os.environ['YOUTUBE_CLIENT_ID'],
-                  'client_secret': os.environ['YOUTUBE_CLIENT_SECRET'],
-                  'refresh_token': os.environ['YOUTUBE_REFRESH_TOKEN'],
+                  'client_id': os.environ[f'YOUTUBE_CLIENT_ID_{proyecto_idx}'],
+                  'client_secret': os.environ[f'YOUTUBE_CLIENT_SECRET_{proyecto_idx}'],
+                  'refresh_token': os.environ[f'YOUTUBE_REFRESH_TOKEN_{proyecto_idx}'],
                   'token_uri': 'https://oauth2.googleapis.com/token',
                   'scopes': ['https://www.googleapis.com/auth/youtube.upload']
               })
@@ -465,7 +484,7 @@ jobs:
               while resp is None:
                   status, resp = req.next_chunk()
                   if status:
-                      print(f"   📤 {int(status.progress()*100)}%")
+                      print(f"    📤 {int(status.progress()*100)}%")
 
               video_id = resp['id']
               print(f"✅ PUBLICADO: https://youtube.com/shorts/{video_id}")
