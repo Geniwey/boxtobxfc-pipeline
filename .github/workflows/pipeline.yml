@@ -410,20 +410,15 @@ jobs:
         continue-on-error: true
         timeout-minutes: 10
         env:
-          # AQUI ESTA LA MAGIA: Mapeamos la variable _1 para que tire del secreto ORIGINAL
-          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          
-          # Los demas proyectos siguen su curso con sus sufijos normales
+          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID_1 }}
+          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET_1 }}
+          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN_1 }}
           YOUTUBE_CLIENT_ID_2: ${{ secrets.YOUTUBE_CLIENT_ID_2 }}
           YOUTUBE_CLIENT_SECRET_2: ${{ secrets.YOUTUBE_CLIENT_SECRET_2 }}
           YOUTUBE_REFRESH_TOKEN_2: ${{ secrets.YOUTUBE_REFRESH_TOKEN_2 }}
-          
           YOUTUBE_CLIENT_ID_3: ${{ secrets.YOUTUBE_CLIENT_ID_3 }}
           YOUTUBE_CLIENT_SECRET_3: ${{ secrets.YOUTUBE_CLIENT_SECRET_3 }}
           YOUTUBE_REFRESH_TOKEN_3: ${{ secrets.YOUTUBE_REFRESH_TOKEN_3 }}
-          
           YOUTUBE_CLIENT_ID_4: ${{ secrets.YOUTUBE_CLIENT_ID_4 }}
           YOUTUBE_CLIENT_SECRET_4: ${{ secrets.YOUTUBE_CLIENT_SECRET_4 }}
           YOUTUBE_REFRESH_TOKEN_4: ${{ secrets.YOUTUBE_REFRESH_TOKEN_4 }}
@@ -484,22 +479,34 @@ jobs:
               while resp is None:
                   status, resp = req.next_chunk()
                   if status:
-                      print(f"    📤 {int(status.progress()*100)}%")
+                      print(f"   📤 {int(status.progress()*100)}%")
 
               video_id = resp['id']
               print(f"✅ PUBLICADO: https://youtube.com/shorts/{video_id}")
               open('video_id.txt','w').write(video_id)
 
           except HttpError as e:
-              print(f"❌ YouTube API {e.resp.status}: {e.content.decode()}")
-              sys.exit(1)
+              error_content = e.content.decode() if hasattr(e, 'content') else str(e)
+              if 'uploadLimitExceeded' in error_content:
+                  print("⚠️ LIMITE DE CANAL ALCANZADO (no es problema de cuota de API ni de proyecto)")
+                  print("   YouTube ha puesto un tope diario de subidas a ESTE CANAL en concreto.")
+                  print("   Rotar de proyecto NO ayuda: el limite es del canal de YouTube, no de la API key.")
+                  print("   Solucion: bajar la cadencia de subidas unos dias y verificar el telefono del canal.")
+                  sys.exit(2)
+              else:
+                  print(f"❌ YouTube API {e.resp.status}: {error_content}")
+                  sys.exit(1)
           except Exception:
               traceback.print_exc()
               sys.exit(1)
           PYTHON_YT
 
-          if python3 /tmp/subir_yt.py; then
+          python3 /tmp/subir_yt.py
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
             echo "youtube_status=✅ YouTube OK" >> $GITHUB_OUTPUT
+          elif [ $EXIT_CODE -eq 2 ]; then
+            echo "youtube_status=⚠️ Limite diario del canal alcanzado (bajar cadencia)" >> $GITHUB_OUTPUT
           else
             echo "youtube_status=❌ YouTube Falló" >> $GITHUB_OUTPUT
           fi
