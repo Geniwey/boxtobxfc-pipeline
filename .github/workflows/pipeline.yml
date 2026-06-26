@@ -1,9 +1,9 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v2.0
+# ⚽ DOBLE FILO - PIPELINE v2.0
 # Añade: rotacion de voz, rotacion de estilo visual, gancho instantaneo seg.0
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v2.0"
+name: "Doble Filo - Pipeline v2.0"
 
 concurrency:
   group: render-b2b-unico
@@ -126,10 +126,10 @@ jobs:
               return re.sub(r' {2,}', ' ', t).strip()
 
           titulo_raw = clean(repair(os.environ.get('TITULO_RAW', '')))
-          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', titulo_raw).strip()[:100] or '⚽ Box to Box FC'
+          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', titulo_raw).strip()[:100] or '⚽ Doble Filo'
 
           desc_raw = clean(repair(os.environ.get('DESCRIPCION_RAW', '')))
-          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts #BoxToBoxFC'
+          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts #DobleFilo'
 
           script_raw = clean(repair(os.environ.get('SCRIPT_RAW', '')))
           script_text = script_raw[:5000] or 'El dato que nadie esperaba. Sigue viendo.'
@@ -150,7 +150,7 @@ jobs:
           PYTHON_EXTRAER
 
           python3 /tmp/extraer.py
-          TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")
+          TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Doble Filo")
           echo "titulo_corto=${TITULO_CORTO}" >> $GITHUB_OUTPUT
 
       - name: "🎙️ Descargar clips Pexels y generar audio (voz rotativa)"
@@ -360,7 +360,7 @@ jobs:
 
           FONT_NAME=$FONT_NAME HIGHLIGHT_ASS_COLOR=$HIGHLIGHT_ASS_COLOR python3 /tmp/gen_ass.py
 
-      - name: "🎬 Renderizar vídeo Box to Box FC"
+      - name: "🎬 Renderizar vídeo Doble Filo"
         timeout-minutes: 20
         run: |
           DUR=$(cat dur.txt)
@@ -378,9 +378,9 @@ jobs:
           draw.rectangle([0,0,320,72],fill=(10,10,10,200))
           try:
               font = ImageFont.truetype(os.path.expanduser('~/.fonts/BebasNeue.ttf'),46)
-              draw.text((12,12),'BOX TO BOX FC',font=font,fill='#FFD700')
+              draw.text((12,12),'DOBLE FILO',font=font,fill='#FFD700')
           except:
-              draw.text((12,20),'BOX TO BOX FC',fill='#FFD700')
+              draw.text((12,20),'DOBLE FILO',fill='#FFD700')
           img.save('logo.png')
           " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
           fi
@@ -410,9 +410,12 @@ jobs:
         continue-on-error: true
         timeout-minutes: 10
         env:
-          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID_1 }}
-          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET_1 }}
-          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN_1 }}
+          # --- ¡AQUÍ ESTÁ LA MAGIA PARA EL PROYECTO 1! ---
+          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          
+          # --- Y LOS DEMÁS SIGUEN IGUAL CON SUS NÚMEROS ---
           YOUTUBE_CLIENT_ID_2: ${{ secrets.YOUTUBE_CLIENT_ID_2 }}
           YOUTUBE_CLIENT_SECRET_2: ${{ secrets.YOUTUBE_CLIENT_SECRET_2 }}
           YOUTUBE_REFRESH_TOKEN_2: ${{ secrets.YOUTUBE_REFRESH_TOKEN_2 }}
@@ -457,7 +460,7 @@ jobs:
                       'description': desc,
                       'tags': [
                           'mundialdefutbol','mundial2026','futbol','shorts',
-                          'futbolshorts','worldcup2026','boxtoboxfc',
+                          'futbolshorts','worldcup2026','doblefilo',
                           'prediccion','pronostico','analisis','tactica',
                           'deporte','fifaworldcup','futbol2026'
                       ],
@@ -509,6 +512,29 @@ jobs:
             echo "youtube_status=⚠️ Limite diario del canal alcanzado (bajar cadencia)" >> $GITHUB_OUTPUT
           else
             echo "youtube_status=❌ YouTube Falló" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "💾 Guardar memoria de noticia/equipo usado"
+        continue-on-error: true
+        env:
+          EQUIPO_USADO: ${{ github.event.client_payload.equipo_usado }}
+        run: |
+          if [ -n "$EQUIPO_USADO" ]; then
+            echo "Guardando '$EQUIPO_USADO' en la memoria..."
+            touch memoria_equipos.txt
+            echo "$EQUIPO_USADO" >> memoria_equipos.txt
+            
+            # Mantener solo los últimos 6 registros
+            tail -n 6 memoria_equipos.txt > tmp.txt && mv tmp.txt memoria_equipos.txt
+            
+            # Subir el cambio a GitHub
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add memoria_equipos.txt
+            git commit -m "🤖 Memoria: Registrado '$EQUIPO_USADO'" || echo "Sin cambios"
+            git push
+          else
+            echo "⚠️ No se recibió equipo_usado en el payload desde Activepieces."
           fi
 
       - name: "📦 Artifacts de diagnóstico"
