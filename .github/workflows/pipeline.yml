@@ -40,6 +40,11 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: "🐍 Configurar Python 3.11"
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
       - name: "🛠️ Instalar dependencias + elegir estilo del vídeo"
         timeout-minutes: 15
         env:
@@ -410,9 +415,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 10
         env:
-          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID_1 }}
-          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET_1 }}
-          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN_1 }}
+          # --- AQUÍ ESTÁ LA CORRECCIÓN DE LAS KEYS ---
+          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_CLIENT_ID_2: ${{ secrets.YOUTUBE_CLIENT_ID_2 }}
           YOUTUBE_CLIENT_SECRET_2: ${{ secrets.YOUTUBE_CLIENT_SECRET_2 }}
           YOUTUBE_REFRESH_TOKEN_2: ${{ secrets.YOUTUBE_REFRESH_TOKEN_2 }}
