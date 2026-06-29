@@ -1,9 +1,9 @@
 # ==============================================================================
-# ⚽ DOBLE FILO - PIPELINE v2.0
+# ⚽ BOX TO BOX FC - PIPELINE v2.0
 # Añade: rotacion de voz, rotacion de estilo visual, gancho instantaneo seg.0
 # ==============================================================================
 
-name: "Doble Filo - Pipeline v2.0"
+name: "Box to Box FC - Pipeline v2.0"
 
 concurrency:
   group: render-b2b-unico
@@ -126,10 +126,10 @@ jobs:
               return re.sub(r' {2,}', ' ', t).strip()
 
           titulo_raw = clean(repair(os.environ.get('TITULO_RAW', '')))
-          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', titulo_raw).strip()[:100] or '⚽ Doble Filo'
+          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', titulo_raw).strip()[:100] or '⚽ Box to Box FC'
 
           desc_raw = clean(repair(os.environ.get('DESCRIPCION_RAW', '')))
-          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts #DobleFilo'
+          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts #BoxToBoxFC'
 
           script_raw = clean(repair(os.environ.get('SCRIPT_RAW', '')))
           script_text = script_raw[:5000] or 'El dato que nadie esperaba. Sigue viendo.'
@@ -150,7 +150,7 @@ jobs:
           PYTHON_EXTRAER
 
           python3 /tmp/extraer.py
-          TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Doble Filo")
+          TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")
           echo "titulo_corto=${TITULO_CORTO}" >> $GITHUB_OUTPUT
 
       - name: "🎙️ Descargar clips Pexels y generar audio (voz rotativa)"
@@ -360,7 +360,7 @@ jobs:
 
           FONT_NAME=$FONT_NAME HIGHLIGHT_ASS_COLOR=$HIGHLIGHT_ASS_COLOR python3 /tmp/gen_ass.py
 
-      - name: "🎬 Renderizar vídeo Doble Filo"
+      - name: "🎬 Renderizar vídeo Box to Box FC"
         timeout-minutes: 20
         run: |
           DUR=$(cat dur.txt)
@@ -378,9 +378,9 @@ jobs:
           draw.rectangle([0,0,320,72],fill=(10,10,10,200))
           try:
               font = ImageFont.truetype(os.path.expanduser('~/.fonts/BebasNeue.ttf'),46)
-              draw.text((12,12),'DOBLE FILO',font=font,fill='#FFD700')
+              draw.text((12,12),'BOX TO BOX FC',font=font,fill='#FFD700')
           except:
-              draw.text((12,20),'DOBLE FILO',fill='#FFD700')
+              draw.text((12,20),'BOX TO BOX FC',fill='#FFD700')
           img.save('logo.png')
           " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
           fi
@@ -405,17 +405,14 @@ jobs:
           fi
           echo "✅ Vídeo renderizado: $(du -sh output.mp4 | cut -f1)"
 
-      - name: "📺 Publicar en YouTube (rotacion 4 proyectos)"
+      - name: "📺 Publicar en YouTube (con failover entre 4 proyectos)"
         id: youtube
         continue-on-error: true
         timeout-minutes: 10
         env:
-          # --- ¡AQUÍ ESTÁ LA MAGIA PARA EL PROYECTO 1! ---
-          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          
-          # --- Y LOS DEMÁS SIGUEN IGUAL CON SUS NÚMEROS ---
+          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID_1 }}
+          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET_1 }}
+          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN_1 }}
           YOUTUBE_CLIENT_ID_2: ${{ secrets.YOUTUBE_CLIENT_ID_2 }}
           YOUTUBE_CLIENT_SECRET_2: ${{ secrets.YOUTUBE_CLIENT_SECRET_2 }}
           YOUTUBE_REFRESH_TOKEN_2: ${{ secrets.YOUTUBE_REFRESH_TOKEN_2 }}
@@ -436,20 +433,30 @@ jobs:
           from googleapiclient.errors import HttpError
           sys.stdout.reconfigure(encoding='utf-8')
 
-          try:
+          def construir_orden_proyectos():
               hora_actual = datetime.now(timezone.utc).hour
-              proyecto_idx = (hora_actual % 4) + 1
-              print(f"Hora UTC: {hora_actual} -> Usando proyecto {proyecto_idx} de 4")
+              preferido = (hora_actual % 4) + 1
+              return [preferido] + [i for i in [1, 2, 3, 4] if i != preferido]
 
+          def construir_credenciales(idx):
+              client_id = os.environ.get(f'YOUTUBE_CLIENT_ID_{idx}', '').strip()
+              client_secret = os.environ.get(f'YOUTUBE_CLIENT_SECRET_{idx}', '').strip()
+              refresh_token = os.environ.get(f'YOUTUBE_REFRESH_TOKEN_{idx}', '').strip()
+              if not client_id or not client_secret or not refresh_token:
+                  return None
               creds = Credentials.from_authorized_user_info({
-                  'client_id': os.environ[f'YOUTUBE_CLIENT_ID_{proyecto_idx}'],
-                  'client_secret': os.environ[f'YOUTUBE_CLIENT_SECRET_{proyecto_idx}'],
-                  'refresh_token': os.environ[f'YOUTUBE_REFRESH_TOKEN_{proyecto_idx}'],
+                  'client_id': client_id,
+                  'client_secret': client_secret,
+                  'refresh_token': refresh_token,
                   'token_uri': 'https://oauth2.googleapis.com/token',
                   'scopes': ['https://www.googleapis.com/auth/youtube.upload']
               })
               creds.refresh(Request())
-              yt = build('youtube', 'v3', credentials=creds)
+              return creds
+
+          try:
+              orden = construir_orden_proyectos()
+              print(f"Orden de proyectos a probar: {orden}")
 
               titulo = open('titulo.txt','r',encoding='utf-8').read().strip()[:100]
               desc = open('descripcion.txt','r',encoding='utf-8').read().strip()[:5000]
@@ -460,7 +467,7 @@ jobs:
                       'description': desc,
                       'tags': [
                           'mundialdefutbol','mundial2026','futbol','shorts',
-                          'futbolshorts','worldcup2026','doblefilo',
+                          'futbolshorts','worldcup2026','boxtoboxfc',
                           'prediccion','pronostico','analisis','tactica',
                           'deporte','fifaworldcup','futbol2026'
                       ],
@@ -475,30 +482,53 @@ jobs:
                   }
               }
 
-              media = MediaFileUpload('output.mp4', mimetype='video/mp4', resumable=True, chunksize=50*1024*1024)
-              req = yt.videos().insert(part='snippet,status', body=body, media_body=media)
+              exito = False
+              canal_lleno = False
 
-              resp = None
-              while resp is None:
-                  status, resp = req.next_chunk()
-                  if status:
-                      print(f"   📤 {int(status.progress()*100)}%")
+              for idx in orden:
+                  print(f"\n🔄 Probando proyecto {idx}...")
+                  try:
+                      creds = construir_credenciales(idx)
+                      if creds is None:
+                          print(f"   ⏭️  Proyecto {idx}: faltan credenciales (revisa secrets _{idx}), salto al siguiente")
+                          continue
 
-              video_id = resp['id']
-              print(f"✅ PUBLICADO: https://youtube.com/shorts/{video_id}")
-              open('video_id.txt','w').write(video_id)
+                      yt = build('youtube', 'v3', credentials=creds)
+                      media = MediaFileUpload('output.mp4', mimetype='video/mp4', resumable=True, chunksize=50*1024*1024)
+                      req = yt.videos().insert(part='snippet,status', body=body, media_body=media)
 
-          except HttpError as e:
-              error_content = e.content.decode() if hasattr(e, 'content') else str(e)
-              if 'uploadLimitExceeded' in error_content:
-                  print("⚠️ LIMITE DE CANAL ALCANZADO (no es problema de cuota de API ni de proyecto)")
-                  print("   YouTube ha puesto un tope diario de subidas a ESTE CANAL en concreto.")
-                  print("   Rotar de proyecto NO ayuda: el limite es del canal de YouTube, no de la API key.")
-                  print("   Solucion: bajar la cadencia de subidas unos dias y verificar el telefono del canal.")
+                      resp = None
+                      while resp is None:
+                          status, resp = req.next_chunk()
+                          if status:
+                              print(f"   📤 {int(status.progress()*100)}%")
+
+                      video_id = resp['id']
+                      print(f"✅ PUBLICADO con proyecto {idx}: https://youtube.com/shorts/{video_id}")
+                      open('video_id.txt','w').write(video_id)
+                      exito = True
+                      break
+
+                  except HttpError as e:
+                      error_content = e.content.decode() if hasattr(e, 'content') else str(e)
+                      if 'uploadLimitExceeded' in error_content:
+                          print(f"⚠️ LIMITE DE CANAL ALCANZADO (proyecto {idx}). Es del CANAL, no del proyecto.")
+                          print("   Probar otros proyectos no sirve, todos suben al mismo canal. Paro aqui.")
+                          canal_lleno = True
+                          break
+                      else:
+                          print(f"   ❌ Proyecto {idx} fallo: {e.resp.status} - {error_content[:200]}")
+                          continue
+                  except Exception as e:
+                      print(f"   ❌ Proyecto {idx} fallo con error inesperado: {e}")
+                      continue
+
+              if canal_lleno:
                   sys.exit(2)
-              else:
-                  print(f"❌ YouTube API {e.resp.status}: {error_content}")
+              elif not exito:
+                  print("❌ Los 4 proyectos fallaron.")
                   sys.exit(1)
+
           except Exception:
               traceback.print_exc()
               sys.exit(1)
@@ -511,30 +541,31 @@ jobs:
           elif [ $EXIT_CODE -eq 2 ]; then
             echo "youtube_status=⚠️ Limite diario del canal alcanzado (bajar cadencia)" >> $GITHUB_OUTPUT
           else
-            echo "youtube_status=❌ YouTube Falló" >> $GITHUB_OUTPUT
+            echo "youtube_status=❌ YouTube Falló (los 4 proyectos fallaron)" >> $GITHUB_OUTPUT
           fi
 
-      - name: "💾 Guardar memoria de noticia/equipo usado"
-        continue-on-error: true
+      - name: "🧠 Actualizar memoria anti-repeticion"
+        if: success()
         env:
           EQUIPO_USADO: ${{ github.event.client_payload.equipo_usado }}
         run: |
-          if [ -n "$EQUIPO_USADO" ]; then
-            echo "Guardando '$EQUIPO_USADO' en la memoria..."
-            touch memoria_equipos.txt
-            echo "$EQUIPO_USADO" >> memoria_equipos.txt
-            
-            # Mantener solo los últimos 6 registros
-            tail -n 6 memoria_equipos.txt > tmp.txt && mv tmp.txt memoria_equipos.txt
-            
-            # Subir el cambio a GitHub
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add memoria_equipos.txt
-            git commit -m "🤖 Memoria: Registrado '$EQUIPO_USADO'" || echo "Sin cambios"
-            git push
+          if [ -z "$EQUIPO_USADO" ]; then
+            echo "⚠️ equipo_usado llego vacio, no se actualiza la memoria esta vez"
           else
-            echo "⚠️ No se recibió equipo_usado en el payload desde Activepieces."
+            touch ultimos_equipos.txt
+            IFS=',' read -ra EQUIPOS_ARR <<< "$EQUIPO_USADO"
+            for eq in "${EQUIPOS_ARR[@]}"; do
+              echo "$eq" >> ultimos_equipos.txt
+            done
+            tail -n 10 ultimos_equipos.txt > ultimos_equipos_tmp.txt
+            mv ultimos_equipos_tmp.txt ultimos_equipos.txt
+            echo "📝 Memoria actualizada:"
+            cat ultimos_equipos.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add ultimos_equipos.txt
+            git commit -m "Memoria: $EQUIPO_USADO" || echo "Sin cambios que commitear"
+            git push || echo "No se pudo hacer push (no critico)"
           fi
 
       - name: "📦 Artifacts de diagnóstico"
