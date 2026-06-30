@@ -40,11 +40,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: "🐍 Configurar Python 3.11"
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
       - name: "🛠️ Instalar dependencias + elegir estilo del vídeo"
         timeout-minutes: 15
         env:
@@ -415,10 +410,9 @@ jobs:
         continue-on-error: true
         timeout-minutes: 10
         env:
-          # --- AQUÍ ESTÁ LA CORRECCIÓN DE LAS KEYS ---
-          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID_1 }}
+          YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET_1 }}
+          YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN_1 }}
           YOUTUBE_CLIENT_ID_2: ${{ secrets.YOUTUBE_CLIENT_ID_2 }}
           YOUTUBE_CLIENT_SECRET_2: ${{ secrets.YOUTUBE_CLIENT_SECRET_2 }}
           YOUTUBE_REFRESH_TOKEN_2: ${{ secrets.YOUTUBE_REFRESH_TOKEN_2 }}
@@ -428,9 +422,10 @@ jobs:
           YOUTUBE_CLIENT_ID_4: ${{ secrets.YOUTUBE_CLIENT_ID_4 }}
           YOUTUBE_CLIENT_SECRET_4: ${{ secrets.YOUTUBE_CLIENT_SECRET_4 }}
           YOUTUBE_REFRESH_TOKEN_4: ${{ secrets.YOUTUBE_REFRESH_TOKEN_4 }}
+          EQUIPO_USADO: ${{ github.event.client_payload.equipo_usado }}
         run: |
           cat << 'PYTHON_YT' > /tmp/subir_yt.py
-          import os, sys, traceback
+          import os, sys, traceback, unicodedata
           from datetime import datetime, timezone
           from google.auth.transport.requests import Request
           from google.oauth2.credentials import Credentials
@@ -460,6 +455,17 @@ jobs:
               creds.refresh(Request())
               return creds
 
+          def normalizar_tag(texto):
+              texto = (texto or '').strip()
+              if not texto:
+                  return None
+              sin_acentos = ''.join(
+                  c for c in unicodedata.normalize('NFD', texto)
+                  if unicodedata.category(c) != 'Mn'
+              )
+              tag = sin_acentos.lower().replace(' ', '').replace('-', '')
+              return tag if len(tag) > 2 else None
+
           try:
               orden = construir_orden_proyectos()
               print(f"Orden de proyectos a probar: {orden}")
@@ -467,16 +473,27 @@ jobs:
               titulo = open('titulo.txt','r',encoding='utf-8').read().strip()[:100]
               desc = open('descripcion.txt','r',encoding='utf-8').read().strip()[:5000]
 
+              tags_equipo_raw = os.environ.get('EQUIPO_USADO', '')
+              tags_dinamicos = []
+              for eq in tags_equipo_raw.split(','):
+                  tag = normalizar_tag(eq)
+                  if tag:
+                      tags_dinamicos.append(tag)
+              print(f"🏷️  Tags dinamicos detectados: {tags_dinamicos}")
+
+              tags_base = [
+                  'mundialdefutbol','mundial2026','futbol','shorts',
+                  'futbolshorts','worldcup2026','boxtoboxfc',
+                  'prediccion','pronostico','analisis','tactica',
+                  'deporte','fifaworldcup','futbol2026'
+              ]
+              tags_finales = list(dict.fromkeys(tags_dinamicos + tags_base))[:30]
+
               body = {
                   'snippet': {
                       'title': titulo,
                       'description': desc,
-                      'tags': [
-                          'mundialdefutbol','mundial2026','futbol','shorts',
-                          'futbolshorts','worldcup2026','boxtoboxfc',
-                          'prediccion','pronostico','analisis','tactica',
-                          'deporte','fifaworldcup','futbol2026'
-                      ],
+                      'tags': tags_finales,
                       'categoryId': '17',
                       'defaultLanguage': 'es',
                       'defaultAudioLanguage': 'es'
