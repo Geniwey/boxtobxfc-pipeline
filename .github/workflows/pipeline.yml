@@ -53,7 +53,7 @@ jobs:
           mkdir -p ~/.fonts
           wget -q --timeout=30 \
             -O ~/.fonts/BebasNeue.ttf \
-            "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" \
+            "[https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf](https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf)" \
             && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV \
             || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf \
                  ~/.fonts/BebasNeue.ttf 2>/dev/null; \
@@ -71,10 +71,10 @@ jobs:
             google-api-python-client numpy tqdm Pillow
 
           python3 -m pip install --quiet \
-            torch --index-url https://download.pytorch.org/whl/cpu \
+            torch --index-url [https://download.pytorch.org/whl/cpu](https://download.pytorch.org/whl/cpu) \
             --break-system-packages 2>/dev/null || \
           python3 -m pip install --quiet \
-            torch --index-url https://download.pytorch.org/whl/cpu
+            torch --index-url [https://download.pytorch.org/whl/cpu](https://download.pytorch.org/whl/cpu)
 
           echo "✅ Dependencias instaladas"
 
@@ -204,7 +204,7 @@ jobs:
               if not api_key: return []
               try:
                   res = requests.get(
-                      f"https://api.pexels.com/videos/search?query={q}&orientation=portrait&size=medium&per_page=15",
+                      f"[https://api.pexels.com/videos/search?query=](https://api.pexels.com/videos/search?query=){q}&orientation=portrait&size=medium&per_page=15",
                       headers={'Authorization': api_key}, timeout=15
                   ).json()
                   links = []
@@ -408,7 +408,7 @@ jobs:
           except:
               draw.text((12,20),'BOX TO BOX FC',fill='#FFD700')
           img.save('logo.png')
-          " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
+          " 2>/dev/null || wget -q -O logo.png "[https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png](https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png)"
           fi
 
           ffmpeg -y \
@@ -488,8 +488,8 @@ jobs:
                   'client_id': client_id,
                   'client_secret': client_secret,
                   'refresh_token': refresh_token,
-                  'token_uri': 'https://oauth2.googleapis.com/token',
-                  'scopes': ['https://www.googleapis.com/auth/youtube.upload']
+                  'token_uri': '[https://oauth2.googleapis.com/token](https://oauth2.googleapis.com/token)',
+                  'scopes': ['[https://www.googleapis.com/auth/youtube.upload](https://www.googleapis.com/auth/youtube.upload)']
               })
               creds.refresh(Request())
               return creds
@@ -566,7 +566,7 @@ jobs:
                               print(f"   📤 {int(status.progress()*100)}%")
 
                       video_id = resp['id']
-                      print(f"✅ PUBLICADO con proyecto {idx}: https://youtube.com/shorts/{video_id}")
+                      print(f"✅ PUBLICADO con proyecto {idx}: [https://youtube.com/shorts/](https://youtube.com/shorts/){video_id}")
                       open('video_id.txt','w').write(video_id)
                       exito = True
                       break
