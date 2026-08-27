@@ -84,15 +84,41 @@ jobs:
           if [ "$STYLE_INDEX" = "0" ]; then
             echo "HIGHLIGHT_ASS_COLOR=&H0000D7FF&" >> $GITHUB_ENV
             echo "BAR_COLOR_HEX=0xFFD700" >> $GITHUB_ENV
+            echo "EQ_FILTRO=brightness=-0.04:saturation=1.25:contrast=1.08" >> $GITHUB_ENV
+            echo "HOOK_Y_OFFSET=-300" >> $GITHUB_ENV
+            echo "ESTILO_NOMBRE=DORADO" >> $GITHUB_ENV
             echo "🎨 Estilo: DORADO"
           elif [ "$STYLE_INDEX" = "1" ]; then
             echo "HIGHLIGHT_ASS_COLOR=&H00FFE500&" >> $GITHUB_ENV
             echo "BAR_COLOR_HEX=0x00E5FF" >> $GITHUB_ENV
+            echo "EQ_FILTRO=brightness=-0.08:saturation=0.95:contrast=1.15" >> $GITHUB_ENV
+            echo "HOOK_Y_OFFSET=-260" >> $GITHUB_ENV
+            echo "ESTILO_NOMBRE=CIAN" >> $GITHUB_ENV
             echo "🎨 Estilo: CIAN"
           else
             echo "HIGHLIGHT_ASS_COLOR=&H000045FF&" >> $GITHUB_ENV
             echo "BAR_COLOR_HEX=0xFF4500" >> $GITHUB_ENV
+            echo "EQ_FILTRO=brightness=-0.02:saturation=1.4:contrast=1.0" >> $GITHUB_ENV
+            echo "HOOK_Y_OFFSET=-340" >> $GITHUB_ENV
+            echo "ESTILO_NOMBRE=CORAL" >> $GITHUB_ENV
             echo "🎨 Estilo: CORAL"
+          fi
+
+          # ── Elegir movimiento de camara al azar (rompe la monotonia visual) ──
+          MOVEMENT_INDEX=$((RANDOM % 4))
+          echo "MOVEMENT_INDEX=$MOVEMENT_INDEX" >> $GITHUB_ENV
+          if [ "$MOVEMENT_INDEX" = "0" ]; then
+            echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
+            echo "🎬 Movimiento: ZOOM LENTO"
+          elif [ "$MOVEMENT_INDEX" = "1" ]; then
+            echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0007\,1.35)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
+            echo "🎬 Movimiento: ZOOM RAPIDO"
+          elif [ "$MOVEMENT_INDEX" = "2" ]; then
+            echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.00015\,1.10)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
+            echo "🎬 Movimiento: ZOOM SUTIL"
+          else
+            echo "ZOOM_EXPR=" >> $GITHUB_ENV
+            echo "🎬 Movimiento: ESTATICO (sin zoom)"
           fi
 
       - name: "📝 Extraer y sanear textos"
@@ -389,7 +415,7 @@ jobs:
             -stream_loop -1 -i pexels.mp4 \
             -i audio.wav \
             -i logo.png \
-            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920,eq=brightness=-0.06:saturation=1.2:contrast=1.05[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2-300:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=${BAR_COLOR_HEX}@0.95:t=fill[outv]" \
+            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,${ZOOM_EXPR}eq=${EQ_FILTRO}[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2${HOOK_Y_OFFSET}:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=${BAR_COLOR_HEX}@0.95:t=fill[outv]" \
             -map "[outv]" -map 1:a \
             -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 \
             -c:a aac -b:a 192k \
@@ -399,11 +425,24 @@ jobs:
             2>&1 | tee ffmpeg.log | tail -5
 
           if [ ! -f "output.mp4" ] || [ "$(stat -c%s output.mp4)" -lt 100000 ]; then
-            echo "❌ FFmpeg generó archivo inválido"
+            echo "❌ FFmpeg generó archivo inválido — reintentando con estilo estatico de emergencia"
+            ffmpeg -y \
+              -stream_loop -1 -i pexels.mp4 \
+              -i audio.wav \
+              -i logo.png \
+              -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,eq=brightness=-0.05:saturation=1.15:contrast=1.05[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2-300:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
+              -map "[outv]" -map 1:a \
+              -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 \
+              -c:a aac -b:a 192k -t "$DUR" -movflags +faststart \
+              output.mp4 2>&1 | tee -a ffmpeg.log | tail -5
+          fi
+
+          if [ ! -f "output.mp4" ] || [ "$(stat -c%s output.mp4)" -lt 100000 ]; then
+            echo "❌ FFmpeg fallo tambien en el reintento de emergencia"
             cat ffmpeg.log | tail -30
             exit 1
           fi
-          echo "✅ Vídeo renderizado: $(du -sh output.mp4 | cut -f1)"
+          echo "✅ Vídeo renderizado ($ESTILO_NOMBRE, movimiento $MOVEMENT_INDEX): $(du -sh output.mp4 | cut -f1)"
 
       - name: "📺 Publicar en YouTube (con failover entre 4 proyectos)"
         id: youtube
