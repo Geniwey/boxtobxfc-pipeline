@@ -1,9 +1,9 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v2.0
-# Añade: rotacion de voz, rotacion de estilo visual, gancho instantaneo seg.0
+# ⚽ BOX TO BOX FC - PIPELINE v3.0 (IA VISUAL ENGINE)
+# Añade: rotacion de voz, estilo visual, gancho instantaneo, IA Pollinations
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v2.0"
+name: "Box to Box FC - Pipeline v3.0"
 
 concurrency:
   group: render-b2b-unico
@@ -30,7 +30,7 @@ jobs:
 
     outputs:
       youtube_status: ${{ steps.youtube.outputs.youtube_status }}
-      video_duration: ${{ steps.audio_gen.outputs.video_duration }}
+      video_duration: ${{ steps.audio_bg_gen.outputs.video_duration }}
       titulo_corto: ${{ steps.extraer.outputs.titulo_corto }}
 
     steps:
@@ -129,6 +129,11 @@ jobs:
           DESCRIPCION_RAW: ${{ github.event.client_payload.descripcion }}
           SCRIPT_RAW: ${{ github.event.client_payload.script_text }}
         run: |
+          # Guardar JSON con todas las variables (incluyendo los prompts de IA)
+          cat << 'EOF' > payload.json
+          ${{ toJson(github.event.client_payload) }}
+          EOF
+
           cat << 'PYTHON_EXTRAER' > /tmp/extraer.py
           import os, sys, re, textwrap
           sys.stdout.reconfigure(encoding='utf-8')
@@ -179,79 +184,14 @@ jobs:
           TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")
           echo "titulo_corto=${TITULO_CORTO}" >> $GITHUB_OUTPUT
 
-      - name: "🎙️ Descargar clips Pexels y generar audio (voz rotativa)"
-        id: audio_gen
-        timeout-minutes: 12
+      - name: "🎙️🎨 Generar Audio, Imágenes IA y Fondo"
+        id: audio_bg_gen
+        timeout-minutes: 15
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
-          cat << 'PYTHON_CLIPS' > /tmp/clips.py
-          import os, requests, sys
-          sys.stdout.reconfigure(encoding='utf-8')
-
-          api_key = os.environ.get('PEXELS_API_KEY', '').strip()
-          query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium world cup'
-
-          FOOTBALL_FALLBACKS = [
-              'football stadium crowd night',
-              'soccer world cup fans celebration',
-              'football pitch aerial stadium',
-              'soccer ball goal net slow motion'
-          ]
-
-          def search_pexels(q):
-              if not api_key: return []
-              try:
-                  res = requests.get(
-                      f"https://api.pexels.com/videos/search?query={q}&orientation=portrait&size=medium&per_page=15",
-                      headers={'Authorization': api_key}, timeout=15
-                  ).json()
-                  links = []
-                  for v in res.get('videos', []):
-                      files = sorted(v['video_files'], key=lambda x: x['width']*x['height'], reverse=True)
-                      for f in files:
-                          if f['width'] <= f['height'] and f.get('link'):
-                              links.append(f['link']); break
-                  return links
-              except: return []
-
-          links = search_pexels(query)
-          if not links:
-              for fb in FOOTBALL_FALLBACKS:
-                  links = search_pexels(fb)
-                  if links: break
-
-          # Variedad: en vez de los primeros 4, baraja antes de elegir
-          import random
-          random.shuffle(links)
-
-          downloaded = []
-          for i, link in enumerate(links[:4]):
-              try:
-                  r = requests.get(link, timeout=30)
-                  if r.status_code == 200:
-                      with open(f'clip_{i}.mp4','wb') as f: f.write(r.content)
-                      downloaded.append(f'clip_{i}.mp4')
-              except: pass
-              if len(downloaded) >= 4: break
-
-          if not downloaded:
-              print("⚠️ Sin clips Pexels. Fondo oscuro de emergencia.")
-              os.system('ffmpeg -y -f lavfi -i "color=c=#0A0A0A:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
-          else:
-              with open('concat_list.txt','w') as f:
-                  for i, clip in enumerate(downloaded):
-                      out = f'norm_{i}.mp4'
-                      os.system(f'ffmpeg -y -i {clip} -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -an {out} 2>/dev/null')
-                      f.write(f"file '{out}'\n")
-              os.system('ffmpeg -y -f concat -safe 0 -i concat_list.txt -c copy pexels.mp4 2>/dev/null')
-          print(f"✅ Clips listos: {len(downloaded)}")
-          PYTHON_CLIPS
-
-          python3 /tmp/clips.py
-
-          # ── Rotacion de voz: una distinta cada vez, no siempre la misma ───
+          # 1. AUDIO PRIMERO (Voz rotativa)
           VOCES=("es-MX-JorgeNeural" "es-ES-AlvaroNeural" "es-AR-TomasNeural" "es-CO-GonzaloNeural" "es-US-AlonsoNeural")
           VOZ_ELEGIDA=${VOCES[$RANDOM % ${#VOCES[@]}]}
           echo "🎙️ Voz elegida: $VOZ_ELEGIDA"
@@ -286,6 +226,100 @@ jobs:
           echo "$DURACION_FINAL" > dur.txt
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
           echo "⏱️ Duración: ${DURACION_FINAL}s"
+
+          # 2. GENERAR FONDO (IA Visual Engine -> Pexels Backup)
+          cat << 'PYTHON_BG' > /tmp/gen_bg.py
+          import os, sys, json, requests, random, urllib.parse
+          sys.stdout.reconfigure(encoding='utf-8')
+
+          dur_total = float(open('dur.txt').read().strip())
+          payload = json.load(open('payload.json', 'r', encoding='utf-8'))
+          prompts = payload.get('prompts_imagenes', [])
+          if not isinstance(prompts, list): prompts = []
+
+          # INTENTO 1: GENERACIÓN DE IMÁGENES POR IA
+          ia_images = []
+          if prompts:
+              print(f"🎨 Generando {len(prompts)} escenas con IA...")
+              for i, p in enumerate(prompts):
+                  safe_p = urllib.parse.quote(p.strip())
+                  url = f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true"
+                  try:
+                      r = requests.get(url, timeout=25)
+                      if r.status_code == 200 and len(r.content) > 30000:
+                          img_path = f"ia_img_{i}.jpg"
+                          with open(img_path, 'wb') as f: f.write(r.content)
+                          ia_images.append(img_path)
+                          print(f" ✅ Escena {i+1} OK")
+                      else:
+                          print(f" ❌ Escena {i+1} Fallo (status: {r.status_code})")
+                  except Exception as e:
+                      print(f" ❌ Escena {i+1} Error de red: {e}")
+
+          if len(ia_images) >= min(4, len(prompts)):
+              print("🎬 Montando slideshow IA perfecto para el audio...")
+              dur_img = dur_total / len(ia_images)
+              with open('ia_list.txt', 'w', encoding='utf-8') as f:
+                  for img in ia_images:
+                      f.write(f"file '{img}'\n")
+                      f.write(f"duration {dur_img:.3f}\n")
+                  f.write(f"file '{ia_images[-1]}'\n") # ffmpeg syntax rule
+              
+              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=crop,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p pexels.mp4 2>/dev/null')
+              
+              if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 100000:
+                  print("✅ Fondo IA generado con éxito!")
+                  sys.exit(0)
+
+          # INTENTO 2: FALLBACK SEGURO A PEXELS (Antiguo código intacto)
+          print("⚠️ IA falló o fue insuficiente. Rescatando clips de Pexels...")
+          api_key = os.environ.get('PEXELS_API_KEY', '').strip()
+          query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium world cup'
+
+          FOOTBALL_FALLBACKS = ['football stadium crowd night', 'soccer world cup fans celebration', 'football pitch aerial stadium', 'soccer ball goal net slow motion']
+
+          def search_pexels(q):
+              if not api_key: return []
+              try:
+                  res = requests.get(f"https://api.pexels.com/videos/search?query={q}&orientation=portrait&size=medium&per_page=15", headers={'Authorization': api_key}, timeout=15).json()
+                  links = []
+                  for v in res.get('videos', []):
+                      for f in sorted(v['video_files'], key=lambda x: x['width']*x['height'], reverse=True):
+                          if f['width'] <= f['height'] and f.get('link'): links.append(f['link']); break
+                  return links
+              except: return []
+
+          links = search_pexels(query)
+          if not links:
+              for fb in FOOTBALL_FALLBACKS:
+                  links = search_pexels(fb)
+                  if links: break
+
+          random.shuffle(links)
+          downloaded = []
+          for i, link in enumerate(links[:4]):
+              try:
+                  r = requests.get(link, timeout=30)
+                  if r.status_code == 200:
+                      with open(f'clip_{i}.mp4','wb') as f: f.write(r.content)
+                      downloaded.append(f'clip_{i}.mp4')
+              except: pass
+              if len(downloaded) >= 4: break
+
+          if not downloaded:
+              print("⚠️ Sin clips Pexels. Fondo oscuro de emergencia.")
+              os.system('ffmpeg -y -f lavfi -i "color=c=#0A0A0A:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
+          else:
+              with open('concat_list.txt','w') as f:
+                  for i, clip in enumerate(downloaded):
+                      out = f'norm_{i}.mp4'
+                      os.system(f'ffmpeg -y -i {clip} -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -an {out} 2>/dev/null')
+                      f.write(f"file '{out}'\n")
+              os.system('ffmpeg -y -f concat -safe 0 -i concat_list.txt -c copy pexels.mp4 2>/dev/null')
+          print(f"✅ Clips Pexels listos: {len(downloaded)}")
+          PYTHON_BG
+
+          python3 /tmp/gen_bg.py
 
       - name: "💬 Generar subtítulos animados (Whisper)"
         timeout-minutes: 15
