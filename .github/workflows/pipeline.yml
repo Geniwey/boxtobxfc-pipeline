@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v5.0 (IA VISUAL ENGINE + MULTI-GPU ROTATION)
+# ⚽ BOX TO BOX FC - PIPELINE v6.0 (TRIPLE ESCUDO IA + MULTI-API)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v5.0"
+name: "Box to Box FC - Pipeline v6.0"
 
 concurrency:
   group: render-b2b-unico
@@ -77,7 +77,6 @@ jobs:
 
           echo "✅ Dependencias instaladas"
 
-          # ── Elegir estilo visual al azar (0=dorado, 1=cian, 2=coral) ──────
           STYLE_INDEX=$((RANDOM % 3))
           echo "STYLE_INDEX=$STYLE_INDEX" >> $GITHUB_ENV
           if [ "$STYLE_INDEX" = "0" ]; then
@@ -100,7 +99,6 @@ jobs:
             echo "ESTILO_NOMBRE=CORAL" >> $GITHUB_ENV
           fi
 
-          # ── Elegir movimiento de camara al azar ──
           MOVEMENT_INDEX=$((RANDOM % 4))
           echo "MOVEMENT_INDEX=$MOVEMENT_INDEX" >> $GITHUB_ENV
           if [ "$MOVEMENT_INDEX" = "0" ]; then
@@ -181,21 +179,14 @@ jobs:
         run: |
           VOCES=("es-MX-JorgeNeural" "es-ES-AlvaroNeural" "es-AR-TomasNeural" "es-CO-GonzaloNeural" "es-US-AlonsoNeural")
           VOZ_ELEGIDA=${VOCES[$RANDOM % ${#VOCES[@]}]}
-          echo "🎙️ Voz elegida: $VOZ_ELEGIDA"
-
+          
           AUDIO_OK=false
-          edge-tts --voice "$VOZ_ELEGIDA" --rate="+8%" --pitch="-2Hz" \
-            --file script_audio.txt --write-media audio_v1.mp3 2>/dev/null || true
-          if [ "$(stat -c%s audio_v1.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then
-            cp audio_v1.mp3 audio.mp3; AUDIO_OK=true
-          fi
+          edge-tts --voice "$VOZ_ELEGIDA" --rate="+8%" --pitch="-2Hz" --file script_audio.txt --write-media audio_v1.mp3 2>/dev/null || true
+          if [ "$(stat -c%s audio_v1.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then cp audio_v1.mp3 audio.mp3; AUDIO_OK=true; fi
 
           if [ "$AUDIO_OK" = "false" ]; then
-            edge-tts --voice "es-ES-AlvaroNeural" --rate="+5%" --pitch="-3Hz" \
-              --file script_audio.txt --write-media audio_v2.mp3 2>/dev/null || true
-            if [ "$(stat -c%s audio_v2.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then
-              cp audio_v2.mp3 audio.mp3; AUDIO_OK=true
-            fi
+            edge-tts --voice "es-ES-AlvaroNeural" --rate="+5%" --pitch="-3Hz" --file script_audio.txt --write-media audio_v2.mp3 2>/dev/null || true
+            if [ "$(stat -c%s audio_v2.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then cp audio_v2.mp3 audio.mp3; AUDIO_OK=true; fi
           fi
 
           if [ "$AUDIO_OK" = "false" ]; then
@@ -203,7 +194,7 @@ jobs:
           fi
 
           ffmpeg -y -i audio.mp3 -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null
-          if [ ! -s "audio.wav" ]; then echo "❌ Audio fallido"; exit 1; fi
+          if [ ! -s "audio.wav" ]; then exit 1; fi
 
           DURACION=$(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 audio.wav 2>/dev/null || echo "30")
           DURACION_FINAL=$(python3 -c "print(f'{max(10,min(60,float(\"$DURACION\"))):.2f}')")
@@ -219,53 +210,74 @@ jobs:
           prompts = payload.get('prompts_imagenes', [])
           if not isinstance(prompts, list): prompts = []
 
-          # INTENTO 1: GENERACIÓN DE IMÁGENES POR IA (ROTACIÓN DE MOTORES)
-          ia_images = []
-          modelos_ia = ['flux', 'realism', 'turbo', 'default']
-          
-          if prompts:
-              print(f"🎨 Generando {len(prompts)} escenas con IA...")
-              for i, p in enumerate(prompts):
-                  exito_escena = False
-                  safe_p = urllib.parse.quote(p.strip())
-                  
-                  for intento in range(4):
-                      modelo = modelos_ia[intento]
-                      url = f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true&seed={random.randint(1,999999)}&model={modelo}"
-                      
-                      try:
-                          headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-                          r = requests.get(url, headers=headers, timeout=25)
-                          
-                          if r.status_code == 200 and len(r.content) > 30000:
-                              img_path = f"ia_img_{i}.jpg"
-                              with open(img_path, 'wb') as f: f.write(r.content)
-                              ia_images.append(img_path)
-                              print(f" ✅ Escena {i+1} OK (Motor: {modelo})")
-                              exito_escena = True
-                              break
-                          elif r.status_code == 429:
-                              print(f" ⏳ Status 429. Esperando 10s...")
-                              time.sleep(10)
-                          else:
-                              print(f" ❌ Fallo {r.status_code} (Motor: {modelo})")
-                              time.sleep(3)
-                      except Exception as e:
-                          print(f" ❌ Timeout (Motor: {modelo})")
-                          time.sleep(3)
-                  
-                  time.sleep(4)
+          USER_AGENTS = [
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15',
+              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+          ]
 
-          # SUPER SALVAVIDAS: Clonar imágenes si conseguimos entre 2 y 5 (Bypass Pexels)
-          if 2 <= len(ia_images) < len(prompts):
-              print(f"⚠️ Solo conseguimos {len(ia_images)} imágenes de IA. Clonando para salvar el vídeo...")
+          ia_images = []
+          
+          def download_pollinations(p, filepath):
+              modelos_ia = ['flux', 'turbo', 'realism']
+              safe_p = urllib.parse.quote(p.strip())
+              for intento in range(3):
+                  modelo = modelos_ia[intento % len(modelos_ia)]
+                  url = f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true&seed={random.randint(1,999999)}&model={modelo}"
+                  try:
+                      r = requests.get(url, headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=25)
+                      if r.status_code == 200 and len(r.content) > 30000:
+                          with open(filepath, 'wb') as f: f.write(r.content)
+                          return True
+                      elif r.status_code == 429:
+                          time.sleep(12) # Espera larga para evadir bloqueo
+                  except:
+                      pass
+                  time.sleep(4)
+              return False
+
+          def download_hercai(p, filepath):
+              safe_p = urllib.parse.quote(p.strip() + " vertical cinematic 8k highly detailed")
+              url = f"https://hercai.onrender.com/v3/text2image?prompt={safe_p}"
+              try:
+                  r = requests.get(url, headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=30)
+                  if r.status_code == 200:
+                      img_url = r.json().get('url')
+                      if img_url:
+                          img_data = requests.get(img_url, timeout=30).content
+                          if len(img_data) > 20000:
+                              with open(filepath, 'wb') as f: f.write(img_data)
+                              return True
+              except:
+                  pass
+              return False
+
+          if prompts:
+              print(f"🎨 Generando escenas con IA (Sistema Multi-Proveedor)...")
+              for i, p in enumerate(prompts):
+                  img_path = f"ia_img_{i}.jpg"
+                  if download_pollinations(p, img_path):
+                      ia_images.append(img_path)
+                      print(f" ✅ Escena {i+1} OK (Pollinations)")
+                  else:
+                      print(f" ⚠️ Pollinations falló. Saltando a Hercai API para la escena {i+1}...")
+                      if download_hercai(p, img_path):
+                          ia_images.append(img_path)
+                          print(f" ✅ Escena {i+1} OK (Hercai Backup)")
+                      else:
+                          print(f" ❌ Escena {i+1} falló en todos los motores.")
+                  time.sleep(3)
+
+          # SUPERVIVENCIA EXTREMA: Clonar imágenes si conseguimos AL MENOS 1 (Aniquila a Pexels)
+          if 1 <= len(ia_images) < len(prompts):
+              print(f"⚠️ Conseguimos {len(ia_images)} imágenes de IA. CLONANDO para rellenar y EVITAR PEXELS a toda costa...")
               idx = 0
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
                   ia_images.append(ia_images[idx])
                   idx += 1
 
-          if len(ia_images) >= 2:
-              print("🎬 Montando slideshow IA perfecto para el audio...")
+          if len(ia_images) >= 1:
+              print("🎬 Montando slideshow IA...")
               dur_img = dur_total / len(ia_images)
               with open('ia_list.txt', 'w', encoding='utf-8') as f:
                   for img in ia_images:
@@ -279,8 +291,8 @@ jobs:
                   print("✅ Fondo IA generado con éxito!")
                   sys.exit(0)
 
-          # INTENTO 2: PEXELS (Solo si la IA muere al 100%)
-          print("⚠️ IA muerta por completo. Rescatando clips de Pexels...")
+          # INTENTO FINAL: PEXELS (Solo si TODA la IA mundial se cae)
+          print("⚠️ IA muerta al 100%. Rescatando Pexels...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
           query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium world cup'
 
