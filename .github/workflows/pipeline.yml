@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v10.0 (SYNCHRONIZED AI VISUALS - ZERO RECYCLING)
+# ⚽ BOX TO BOX FC - PIPELINE v11.0 (IMAGE PURIFIER + ZERO PEXELS)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v10.0"
+name: "Box to Box FC - Pipeline v11.0"
 
 concurrency:
   group: render-b2b-unico
@@ -136,6 +136,7 @@ jobs:
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
           import os, sys, json, requests, random, urllib.parse, time
+          from PIL import Image
           sys.stdout.reconfigure(encoding='utf-8')
 
           dur_total = float(open('dur.txt').read().strip())
@@ -151,54 +152,46 @@ jobs:
 
           ia_images = []
 
+          def purificar_imagen(ruta):
+              try:
+                  img = Image.open(ruta).convert('RGB')
+                  img.save(ruta, 'JPEG', quality=95)
+                  return True
+              except Exception as e:
+                  print(f"   ⚠️ Error de formato corrupto en {ruta}: {e}")
+                  return False
+
           def generar_imagen(p_original, index):
               path = f"ia_img_{index}.jpg"
-              
-              # Degradación inteligente: si falla mucho, simplificamos el prompt para evadir filtros NSFW/violencia
               p_medio = p_original.split(", cinematic")[0] + " cinematic lighting 8k"
               p_basico = " ".join(p_original.split(" ")[:6]) + " football match stadium 8k"
 
               for ronda in range(15):
                   print(f"   ▶️ Ronda {ronda+1}/15 para escena {index+1}...")
-                  
-                  # Asignar nivel de detalle del prompt según la ronda (evasión de filtros)
                   prompt_actual = p_original if ronda < 5 else (p_medio if ronda < 10 else p_basico)
                   safe_p = urllib.parse.quote(prompt_actual.strip())
 
-                  # Pollinations
                   try:
                       modelo = random.choice(['flux', 'realism', 'turbo'])
                       r = requests.get(f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true&model={modelo}&seed={random.randint(1,99999)}", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
                       if r.status_code == 200 and len(r.content) > 30000:
                           with open(path, 'wb') as f: f.write(r.content)
-                          print(f"   ✅ Éxito Pollinations ({modelo})")
-                          return path
+                          if purificar_imagen(path):
+                              print(f"   ✅ Éxito Pollinations ({modelo}) y Purificada")
+                              return path
                   except: pass
                   time.sleep(2)
 
-                  # Airforce
                   try:
                       r = requests.get(f"https://api.airforce/v1/imagine2?prompt={safe_p}&size=1080x1920", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
                       if r.status_code == 200 and len(r.content) > 20000:
                           with open(path, 'wb') as f: f.write(r.content)
-                          print("   ✅ Éxito Airforce")
-                          return path
+                          if purificar_imagen(path):
+                              print("   ✅ Éxito Airforce y Purificada")
+                              return path
                   except: pass
                   time.sleep(2)
 
-                  # Hercai
-                  try:
-                      r = requests.get(f"https://hercai.onrender.com/v3/text2image?prompt={safe_p}", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
-                      if r.status_code == 200:
-                          img_url = r.json().get('url')
-                          if img_url:
-                              r2 = requests.get(img_url, timeout=45)
-                              if len(r2.content) > 20000:
-                                  with open(path, 'wb') as f: f.write(r2.content)
-                                  print("   ✅ Éxito Hercai")
-                                  return path
-                  except: pass
-                  
                   print("   ⏳ Reintentando...")
                   time.sleep(5)
               return None
@@ -211,12 +204,14 @@ jobs:
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Fallo crítico en escena {i+1}. Se usará una imagen comodín generada en el momento.")
-                      # Comodín genérico garantizado para no romper la sincronía
+                      print(f" ❌ Fallo crítico en escena {i+1}. Usando comodín.")
                       res_emergencia = generar_imagen("epic dramatic football stadium crowds night lights highly detailed 8k", i)
                       if res_emergencia: ia_images.append(res_emergencia)
 
           if len(ia_images) > 0:
+              while len(ia_images) < len(prompts) and len(ia_images) < 6:
+                  ia_images.append(ia_images[-1])
+                  
               print("\n🎬 Sincronía visual perfecta lograda. Montando vídeo...")
               dur_img = dur_total / len(ia_images)
               with open('ia_list.txt', 'w', encoding='utf-8') as f:
@@ -225,8 +220,14 @@ jobs:
                       f.write(f"duration {dur_img:.3f}\n")
                   f.write(f"file '{ia_images[-1]}'\n")
               
-              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=crop,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
-              if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 50000: sys.exit(0)
+              # Renderizado seguro con errores visibles en consola si falla
+              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=crop,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4')
+              
+              if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 50000:
+                  print("✅ Fondo IA generado y blindado con éxito!")
+                  sys.exit(0)
+              else:
+                  print("❌ FFMPEG falló al montar el vídeo o pesa muy poco.")
 
           print("\n⚠️ Apocalipsis IA mundial. Rescatando Pexels...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
