@@ -1,9 +1,9 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v3.0 (IA VISUAL ENGINE)
-# Añade: rotacion de voz, estilo visual, gancho instantaneo, IA Pollinations
+# ⚽ BOX TO BOX FC - PIPELINE v4.0 (IA VISUAL ENGINE + RATE LIMIT BYPASS)
+# Añade: rotacion de voz, estilo visual, gancho instantaneo, IA Pollinations con reintentos
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v3.0"
+name: "Box to Box FC - Pipeline v4.0"
 
 concurrency:
   group: render-b2b-unico
@@ -229,7 +229,7 @@ jobs:
 
           # 2. GENERAR FONDO (IA Visual Engine -> Pexels Backup)
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, requests, random, urllib.parse
+          import os, sys, json, requests, random, urllib.parse, time
           sys.stdout.reconfigure(encoding='utf-8')
 
           dur_total = float(open('dur.txt').read().strip())
@@ -237,24 +237,42 @@ jobs:
           prompts = payload.get('prompts_imagenes', [])
           if not isinstance(prompts, list): prompts = []
 
-          # INTENTO 1: GENERACIÓN DE IMÁGENES POR IA
+          # INTENTO 1: GENERACIÓN DE IMÁGENES POR IA CON RETRY SYSTEM
           ia_images = []
           if prompts:
               print(f"🎨 Generando {len(prompts)} escenas con IA...")
               for i, p in enumerate(prompts):
                   safe_p = urllib.parse.quote(p.strip())
-                  url = f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true"
-                  try:
-                      r = requests.get(url, timeout=25)
-                      if r.status_code == 200 and len(r.content) > 30000:
-                          img_path = f"ia_img_{i}.jpg"
-                          with open(img_path, 'wb') as f: f.write(r.content)
-                          ia_images.append(img_path)
-                          print(f" ✅ Escena {i+1} OK")
-                      else:
-                          print(f" ❌ Escena {i+1} Fallo (status: {r.status_code})")
-                  except Exception as e:
-                      print(f" ❌ Escena {i+1} Error de red: {e}")
+                  url = f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true&seed={random.randint(1,999999)}"
+                  
+                  exito_escena = False
+                  for intento in range(3): # Reintentar hasta 3 veces si da error 429
+                      try:
+                          headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                          r = requests.get(url, headers=headers, timeout=30)
+                          
+                          if r.status_code == 200 and len(r.content) > 30000:
+                              img_path = f"ia_img_{i}.jpg"
+                              with open(img_path, 'wb') as f: f.write(r.content)
+                              ia_images.append(img_path)
+                              print(f" ✅ Escena {i+1} OK")
+                              exito_escena = True
+                              break
+                          elif r.status_code == 429:
+                              print(f" ⏳ Escena {i+1} bloqueada (Status 429). Esperando 10 segundos antes de reintentar...")
+                              time.sleep(10)
+                          else:
+                              print(f" ❌ Escena {i+1} Fallo (status: {r.status_code}) en el intento {intento+1}")
+                              time.sleep(4)
+                      except Exception as e:
+                          print(f" ❌ Escena {i+1} Error de red (intento {intento+1}): {e}")
+                          time.sleep(4)
+                  
+                  if not exito_escena:
+                      print(f" ⚠️ Se abandonó la escena {i+1} tras 3 intentos fallidos.")
+                  
+                  # Pausa de 5 segundos entre imágenes para no saturar los servidores y evitar baneos temporales
+                  time.sleep(5)
 
           if len(ia_images) >= min(4, len(prompts)):
               print("🎬 Montando slideshow IA perfecto para el audio...")
@@ -263,7 +281,7 @@ jobs:
                   for img in ia_images:
                       f.write(f"file '{img}'\n")
                       f.write(f"duration {dur_img:.3f}\n")
-                  f.write(f"file '{ia_images[-1]}'\n") # ffmpeg syntax rule
+                  f.write(f"file '{ia_images[-1]}'\n")
               
               os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=crop,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p pexels.mp4 2>/dev/null')
               
@@ -271,7 +289,7 @@ jobs:
                   print("✅ Fondo IA generado con éxito!")
                   sys.exit(0)
 
-          # INTENTO 2: FALLBACK SEGURO A PEXELS (Antiguo código intacto)
+          # INTENTO 2: FALLBACK SEGURO A PEXELS
           print("⚠️ IA falló o fue insuficiente. Rescatando clips de Pexels...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
           query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium world cup'
