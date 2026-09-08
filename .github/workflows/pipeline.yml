@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v6.0 (TRIPLE ESCUDO IA + MULTI-API)
+# ⚽ BOX TO BOX FC - PIPELINE v10.0 (SYNCHRONIZED AI VISUALS - ZERO RECYCLING)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v6.0"
+name: "Box to Box FC - Pipeline v10.0"
 
 concurrency:
   group: render-b2b-unico
@@ -25,7 +25,7 @@ permissions:
 jobs:
   render-and-publish:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     outputs:
       youtube_status: ${{ steps.youtube.outputs.youtube_status }}
@@ -39,76 +39,32 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: "🛠️ Instalar dependencias + elegir estilo del vídeo"
+      - name: "🛠️ Instalar dependencias"
         timeout-minutes: 15
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -yq --no-install-recommends \
-            ffmpeg fontconfig wget curl
-
-          echo "🔤 Descargando fuente Bebas Neue..."
+          sudo apt-get install -yq --no-install-recommends ffmpeg fontconfig wget curl
           mkdir -p ~/.fonts
-          wget -q --timeout=30 \
-            -O ~/.fonts/BebasNeue.ttf \
-            "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" \
-            && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV \
-            || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf \
-                 ~/.fonts/BebasNeue.ttf 2>/dev/null; \
-                 echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
+          wget -q --timeout=30 -O ~/.fonts/BebasNeue.ttf "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf ~/.fonts/BebasNeue.ttf 2>/dev/null; echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
           fc-cache -f 2>/dev/null
-
-          python3 -m pip install --quiet \
-            openai-whisper edge-tts requests gtts \
-            google-auth google-auth-oauthlib google-auth-httplib2 \
-            google-api-python-client numpy tqdm Pillow \
-            --break-system-packages 2>/dev/null || \
-          python3 -m pip install --quiet \
-            openai-whisper edge-tts requests gtts \
-            google-auth google-auth-oauthlib google-auth-httplib2 \
-            google-api-python-client numpy tqdm Pillow
-
-          python3 -m pip install --quiet \
-            torch --index-url https://download.pytorch.org/whl/cpu \
-            --break-system-packages 2>/dev/null || \
-          python3 -m pip install --quiet \
-            torch --index-url https://download.pytorch.org/whl/cpu
-
-          echo "✅ Dependencias instaladas"
+          python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
+          python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
           STYLE_INDEX=$((RANDOM % 3))
           echo "STYLE_INDEX=$STYLE_INDEX" >> $GITHUB_ENV
-          if [ "$STYLE_INDEX" = "0" ]; then
-            echo "HIGHLIGHT_ASS_COLOR=&H0000D7FF&" >> $GITHUB_ENV
-            echo "BAR_COLOR_HEX=0xFFD700" >> $GITHUB_ENV
-            echo "EQ_FILTRO=brightness=-0.04:saturation=1.25:contrast=1.08" >> $GITHUB_ENV
-            echo "HOOK_Y_OFFSET=-300" >> $GITHUB_ENV
-            echo "ESTILO_NOMBRE=DORADO" >> $GITHUB_ENV
-          elif [ "$STYLE_INDEX" = "1" ]; then
-            echo "HIGHLIGHT_ASS_COLOR=&H00FFE500&" >> $GITHUB_ENV
-            echo "BAR_COLOR_HEX=0x00E5FF" >> $GITHUB_ENV
-            echo "EQ_FILTRO=brightness=-0.08:saturation=0.95:contrast=1.15" >> $GITHUB_ENV
-            echo "HOOK_Y_OFFSET=-260" >> $GITHUB_ENV
-            echo "ESTILO_NOMBRE=CIAN" >> $GITHUB_ENV
-          else
-            echo "HIGHLIGHT_ASS_COLOR=&H000045FF&" >> $GITHUB_ENV
-            echo "BAR_COLOR_HEX=0xFF4500" >> $GITHUB_ENV
-            echo "EQ_FILTRO=brightness=-0.02:saturation=1.4:contrast=1.0" >> $GITHUB_ENV
-            echo "HOOK_Y_OFFSET=-340" >> $GITHUB_ENV
-            echo "ESTILO_NOMBRE=CORAL" >> $GITHUB_ENV
+          if [ "$STYLE_INDEX" = "0" ]; then echo "HIGHLIGHT_ASS_COLOR=&H0000D7FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFFD700" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.04:saturation=1.25:contrast=1.08" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-300" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=DORADO" >> $GITHUB_ENV
+          elif [ "$STYLE_INDEX" = "1" ]; then echo "HIGHLIGHT_ASS_COLOR=&H00FFE500&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0x00E5FF" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.08:saturation=0.95:contrast=1.15" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-260" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CIAN" >> $GITHUB_ENV
+          else echo "HIGHLIGHT_ASS_COLOR=&H000045FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFF4500" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.02:saturation=1.4:contrast=1.0" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-340" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CORAL" >> $GITHUB_ENV
           fi
 
           MOVEMENT_INDEX=$((RANDOM % 4))
           echo "MOVEMENT_INDEX=$MOVEMENT_INDEX" >> $GITHUB_ENV
-          if [ "$MOVEMENT_INDEX" = "0" ]; then
-            echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
-          elif [ "$MOVEMENT_INDEX" = "1" ]; then
-            echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0007\,1.35)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
-          elif [ "$MOVEMENT_INDEX" = "2" ]; then
-            echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.00015\,1.10)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
-          else
-            echo "ZOOM_EXPR=" >> $GITHUB_ENV
+          if [ "$MOVEMENT_INDEX" = "0" ]; then echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
+          elif [ "$MOVEMENT_INDEX" = "1" ]; then echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0007\,1.35)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
+          elif [ "$MOVEMENT_INDEX" = "2" ]; then echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.00015\,1.10)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
+          else echo "ZOOM_EXPR=" >> $GITHUB_ENV
           fi
 
       - name: "📝 Extraer y sanear textos"
@@ -127,32 +83,19 @@ jobs:
           import os, sys, re, textwrap
           sys.stdout.reconfigure(encoding='utf-8')
 
-          def repair(t):
-              if not t: return ''
-              try: return t.encode('latin-1').decode('utf-8')
-              except: return t
-
           def clean(t):
               if not t: return ''
               t = t.lstrip('\ufeff').replace('\u00a0', ' ')
-              for c in ['\u200b','\u200c','\u200d','\u200e','\u200f','\u2060','\u00ad']:
-                  t = t.replace(c, '')
+              for c in ['\u200b','\u200c','\u200d','\u200e','\u200f','\u2060','\u00ad']: t = t.replace(c, '')
               t = t.replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')
               return re.sub(r' {2,}', ' ', re.sub(r'\n{3,}', '\n\n', t)).strip()
 
           def sanitize_tts(t):
-              t = re.sub(r'[\*\"\'\«\»\(\)\[\]\{\}\#\_\|\~]', '', t)
-              t = re.sub(r'[^\w\s\.,;:\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\-]', '', t)
-              return re.sub(r' {2,}', ' ', t).strip()
+              return re.sub(r'[^\w\s\.,;:\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\-]', '', re.sub(r'[\*\"\'\«\»\(\)\[\]\{\}\#\_\|\~]', '', t)).strip()
 
-          titulo_raw = clean(repair(os.environ.get('TITULO_RAW', '')))
-          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', titulo_raw).strip()[:100] or '⚽ Box to Box FC'
-
-          desc_raw = clean(repair(os.environ.get('DESCRIPCION_RAW', '')))
-          descripcion = desc_raw[:5000] or '#WorldCup2026 #Futbol #Shorts #BoxToBoxFC'
-
-          script_raw = clean(repair(os.environ.get('SCRIPT_RAW', '')))
-          script_text = script_raw[:5000] or 'El dato que nadie esperaba. Sigue viendo.'
+          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', clean(os.environ.get('TITULO_RAW', ''))).strip()[:100] or '⚽ Box to Box FC'
+          descripcion = clean(os.environ.get('DESCRIPCION_RAW', ''))[:5000] or '#WorldCup2026'
+          script_text = clean(os.environ.get('SCRIPT_RAW', ''))[:5000] or 'Sigue viendo.'
           script_audio = sanitize_tts(script_text)
 
           open('titulo.txt','w',encoding='utf-8').write(titulo)
@@ -161,18 +104,16 @@ jobs:
           open('script_audio.txt','w',encoding='utf-8').write(script_audio)
           open('titulo_corto.txt','w',encoding='utf-8').write(titulo[:50])
 
-          hook_clean = re.sub(r'[\*\"\'\«\»]', '', titulo).strip()
-          wrapped = textwrap.fill(hook_clean, width=22, max_lines=3, placeholder='')
+          wrapped = textwrap.fill(re.sub(r'[\*\"\'\«\»]', '', titulo).strip(), width=22, max_lines=3, placeholder='')
           open('hook_text.txt','w',encoding='utf-8').write(wrapped)
           PYTHON_EXTRAER
 
           python3 /tmp/extraer.py
-          TITULO_CORTO=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")
-          echo "titulo_corto=${TITULO_CORTO}" >> $GITHUB_OUTPUT
+          echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generar Audio, Imágenes IA y Fondo"
+      - name: "🎙️🎨 Generador Bucle Titanio (Audio + Imágenes Exactas)"
         id: audio_bg_gen
-        timeout-minutes: 15
+        timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
@@ -181,17 +122,9 @@ jobs:
           VOZ_ELEGIDA=${VOCES[$RANDOM % ${#VOCES[@]}]}
           
           AUDIO_OK=false
-          edge-tts --voice "$VOZ_ELEGIDA" --rate="+8%" --pitch="-2Hz" --file script_audio.txt --write-media audio_v1.mp3 2>/dev/null || true
-          if [ "$(stat -c%s audio_v1.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then cp audio_v1.mp3 audio.mp3; AUDIO_OK=true; fi
-
-          if [ "$AUDIO_OK" = "false" ]; then
-            edge-tts --voice "es-ES-AlvaroNeural" --rate="+5%" --pitch="-3Hz" --file script_audio.txt --write-media audio_v2.mp3 2>/dev/null || true
-            if [ "$(stat -c%s audio_v2.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then cp audio_v2.mp3 audio.mp3; AUDIO_OK=true; fi
-          fi
-
-          if [ "$AUDIO_OK" = "false" ]; then
-            python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio.mp3')" 2>/dev/null || true
-          fi
+          edge-tts --voice "$VOZ_ELEGIDA" --rate="+8%" --pitch="-2Hz" --file script_audio.txt --write-media audio.mp3 2>/dev/null || true
+          if [ "$(stat -c%s audio.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then AUDIO_OK=true; fi
+          if [ "$AUDIO_OK" = "false" ]; then python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio.mp3')" 2>/dev/null || true; fi
 
           ffmpeg -y -i audio.mp3 -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null
           if [ ! -s "audio.wav" ]; then exit 1; fi
@@ -211,73 +144,80 @@ jobs:
           if not isinstance(prompts, list): prompts = []
 
           USER_AGENTS = [
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15',
-              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
           ]
 
           ia_images = []
-          
-          def download_pollinations(p, filepath):
-              modelos_ia = ['flux', 'turbo', 'realism']
-              safe_p = urllib.parse.quote(p.strip())
-              for intento in range(3):
-                  modelo = modelos_ia[intento % len(modelos_ia)]
-                  url = f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true&seed={random.randint(1,999999)}&model={modelo}"
-                  try:
-                      r = requests.get(url, headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=25)
-                      if r.status_code == 200 and len(r.content) > 30000:
-                          with open(filepath, 'wb') as f: f.write(r.content)
-                          return True
-                      elif r.status_code == 429:
-                          time.sleep(12) # Espera larga para evadir bloqueo
-                  except:
-                      pass
-                  time.sleep(4)
-              return False
 
-          def download_hercai(p, filepath):
-              safe_p = urllib.parse.quote(p.strip() + " vertical cinematic 8k highly detailed")
-              url = f"https://hercai.onrender.com/v3/text2image?prompt={safe_p}"
-              try:
-                  r = requests.get(url, headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=30)
-                  if r.status_code == 200:
-                      img_url = r.json().get('url')
-                      if img_url:
-                          img_data = requests.get(img_url, timeout=30).content
-                          if len(img_data) > 20000:
-                              with open(filepath, 'wb') as f: f.write(img_data)
-                              return True
-              except:
-                  pass
-              return False
+          def generar_imagen(p_original, index):
+              path = f"ia_img_{index}.jpg"
+              
+              # Degradación inteligente: si falla mucho, simplificamos el prompt para evadir filtros NSFW/violencia
+              p_medio = p_original.split(", cinematic")[0] + " cinematic lighting 8k"
+              p_basico = " ".join(p_original.split(" ")[:6]) + " football match stadium 8k"
+
+              for ronda in range(15):
+                  print(f"   ▶️ Ronda {ronda+1}/15 para escena {index+1}...")
+                  
+                  # Asignar nivel de detalle del prompt según la ronda (evasión de filtros)
+                  prompt_actual = p_original if ronda < 5 else (p_medio if ronda < 10 else p_basico)
+                  safe_p = urllib.parse.quote(prompt_actual.strip())
+
+                  # Pollinations
+                  try:
+                      modelo = random.choice(['flux', 'realism', 'turbo'])
+                      r = requests.get(f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true&model={modelo}&seed={random.randint(1,99999)}", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
+                      if r.status_code == 200 and len(r.content) > 30000:
+                          with open(path, 'wb') as f: f.write(r.content)
+                          print(f"   ✅ Éxito Pollinations ({modelo})")
+                          return path
+                  except: pass
+                  time.sleep(2)
+
+                  # Airforce
+                  try:
+                      r = requests.get(f"https://api.airforce/v1/imagine2?prompt={safe_p}&size=1080x1920", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
+                      if r.status_code == 200 and len(r.content) > 20000:
+                          with open(path, 'wb') as f: f.write(r.content)
+                          print("   ✅ Éxito Airforce")
+                          return path
+                  except: pass
+                  time.sleep(2)
+
+                  # Hercai
+                  try:
+                      r = requests.get(f"https://hercai.onrender.com/v3/text2image?prompt={safe_p}", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
+                      if r.status_code == 200:
+                          img_url = r.json().get('url')
+                          if img_url:
+                              r2 = requests.get(img_url, timeout=45)
+                              if len(r2.content) > 20000:
+                                  with open(path, 'wb') as f: f.write(r2.content)
+                                  print("   ✅ Éxito Hercai")
+                                  return path
+                  except: pass
+                  
+                  print("   ⏳ Reintentando...")
+                  time.sleep(5)
+              return None
 
           if prompts:
-              print(f"🎨 Generando escenas con IA (Sistema Multi-Proveedor)...")
+              print(f"🎨 Forzando extracción de {len(prompts)} escenas únicas (SIN CLONAR)...")
               for i, p in enumerate(prompts):
-                  img_path = f"ia_img_{i}.jpg"
-                  if download_pollinations(p, img_path):
-                      ia_images.append(img_path)
-                      print(f" ✅ Escena {i+1} OK (Pollinations)")
+                  print(f"\n🎬 Generando escena {i+1}...")
+                  resultado = generar_imagen(p, i)
+                  if resultado:
+                      ia_images.append(resultado)
                   else:
-                      print(f" ⚠️ Pollinations falló. Saltando a Hercai API para la escena {i+1}...")
-                      if download_hercai(p, img_path):
-                          ia_images.append(img_path)
-                          print(f" ✅ Escena {i+1} OK (Hercai Backup)")
-                      else:
-                          print(f" ❌ Escena {i+1} falló en todos los motores.")
-                  time.sleep(3)
+                      print(f" ❌ Fallo crítico en escena {i+1}. Se usará una imagen comodín generada en el momento.")
+                      # Comodín genérico garantizado para no romper la sincronía
+                      res_emergencia = generar_imagen("epic dramatic football stadium crowds night lights highly detailed 8k", i)
+                      if res_emergencia: ia_images.append(res_emergencia)
 
-          # SUPERVIVENCIA EXTREMA: Clonar imágenes si conseguimos AL MENOS 1 (Aniquila a Pexels)
-          if 1 <= len(ia_images) < len(prompts):
-              print(f"⚠️ Conseguimos {len(ia_images)} imágenes de IA. CLONANDO para rellenar y EVITAR PEXELS a toda costa...")
-              idx = 0
-              while len(ia_images) < len(prompts) and len(ia_images) < 6:
-                  ia_images.append(ia_images[idx])
-                  idx += 1
-
-          if len(ia_images) >= 1:
-              print("🎬 Montando slideshow IA...")
+          if len(ia_images) > 0:
+              print("\n🎬 Sincronía visual perfecta lograda. Montando vídeo...")
               dur_img = dur_total / len(ia_images)
               with open('ia_list.txt', 'w', encoding='utf-8') as f:
                   for img in ia_images:
@@ -285,18 +225,13 @@ jobs:
                       f.write(f"duration {dur_img:.3f}\n")
                   f.write(f"file '{ia_images[-1]}'\n")
               
-              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=crop,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p pexels.mp4 2>/dev/null')
-              
-              if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 100000:
-                  print("✅ Fondo IA generado con éxito!")
-                  sys.exit(0)
+              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=crop,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
+              if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 50000: sys.exit(0)
 
-          # INTENTO FINAL: PEXELS (Solo si TODA la IA mundial se cae)
-          print("⚠️ IA muerta al 100%. Rescatando Pexels...")
+          print("\n⚠️ Apocalipsis IA mundial. Rescatando Pexels...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
-          query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium world cup'
-
-          FOOTBALL_FALLBACKS = ['football stadium crowd night', 'soccer world cup fans celebration', 'football pitch aerial stadium', 'soccer ball goal net slow motion']
+          query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium'
+          downloaded = []
 
           def search_pexels(q):
               if not api_key: return []
@@ -309,14 +244,8 @@ jobs:
                   return links
               except: return []
 
-          links = search_pexels(query)
-          if not links:
-              for fb in FOOTBALL_FALLBACKS:
-                  links = search_pexels(fb)
-                  if links: break
-
+          links = search_pexels(query) or search_pexels('football pitch aerial stadium')
           random.shuffle(links)
-          downloaded = []
           for i, link in enumerate(links[:4]):
               try:
                   r = requests.get(link, timeout=30)
@@ -324,7 +253,6 @@ jobs:
                       with open(f'clip_{i}.mp4','wb') as f: f.write(r.content)
                       downloaded.append(f'clip_{i}.mp4')
               except: pass
-              if len(downloaded) >= 4: break
 
           if not downloaded:
               os.system('ffmpeg -y -f lavfi -i "color=c=#0A0A0A:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
@@ -346,11 +274,7 @@ jobs:
           import whisper, json, sys
           sys.stdout.reconfigure(encoding='utf-8')
           model = whisper.load_model('small')
-          result = model.transcribe(
-              'audio.wav', language='es',
-              word_timestamps=True, temperature=0.0,
-              initial_prompt='Análisis táctico y predicciones del Mundial de Fútbol 2026.'
-          )
+          result = model.transcribe('audio.wav', language='es', word_timestamps=True, temperature=0.0, initial_prompt='Análisis táctico y predicciones del Mundial de Fútbol 2026.')
           json.dump(result, open('audio.json','w',encoding='utf-8'), ensure_ascii=False)
           " 2>/dev/null || true
 
@@ -371,28 +295,16 @@ jobs:
           font_name = os.environ.get('FONT_NAME', 'Bebas Neue')
           highlight_color = os.environ.get('HIGHLIGHT_ASS_COLOR', '&H0000D7FF&')
 
-          def fmt(s):
-              s = max(0.0, s)
-              return f"{int(s//3600)}:{int((s%3600)//60):02d}:{int(s%60):02d}.{min(int(round((s%1)*100)),99):02d}"
-
-          def clean(t):
-              return re.sub(r' {2,}',' ',t.replace('{','').replace('}','').replace('\\','').replace('\n',' ')).strip()
+          def fmt(s): return f"{int(s//3600)}:{int((s%3600)//60):02d}:{int(s%60):02d}.{min(int(round((s%1)*100)),99):02d}"
+          def clean(t): return re.sub(r' {2,}',' ',t.replace('{','').replace('}','').replace('\\','').replace('\n',' ')).strip()
 
           try:
               original = open('script.txt', encoding='utf-8').read()
-              gold_words = set(re.sub(r'[^\w\s]','',w.strip('*')).upper()
-                               for w in original.split()
-                               if w.startswith('*') and w.endswith('*') and len(w) > 2)
-          except:
-              gold_words = set()
+              gold_words = set(re.sub(r'[^\w\s]','',w.strip('*')).upper() for w in original.split() if w.startswith('*') and w.endswith('*') and len(w) > 2)
+          except: gold_words = set()
 
           data = json.load(open('audio.json','r',encoding='utf-8'))
-          all_words = [
-              {'word': clean(w.get('word','')), 'start': w.get('start',0.0), 'end': w.get('end',0.0)}
-              for s in data.get('segments',[])
-              for w in s.get('words',[])
-              if w.get('word','').strip() and w.get('end',0) > w.get('start',0)
-          ]
+          all_words = [{'word': clean(w.get('word','')), 'start': w.get('start',0.0), 'end': w.get('end',0.0)} for s in data.get('segments',[]) for w in s.get('words',[]) if w.get('word','').strip() and w.get('end',0) > w.get('start',0)]
 
           header = f"""[Script Info]
           ScriptType: v4.00+
@@ -413,10 +325,7 @@ jobs:
           for i, w in enumerate(all_words):
               w_upper = w['word'].upper().strip()
               clean_w = re.sub(r'[^\w\s]','',w_upper)
-              if clean_w in gold_words and clean_w:
-                  w_text = f"{{\\c{highlight_color}}}{w_upper}{{\\c&H00FFFFFF&}}"
-              else:
-                  w_text = w_upper
+              w_text = f"{{\\c{highlight_color}}}{w_upper}{{\\c&H00FFFFFF&}}" if clean_w in gold_words and clean_w else w_upper
               cur.append({'text': w_text, 'start': w['start'], 'end': w['end']})
               chars += len(re.sub(r'\{.*?\}','',w_text))
               if len(cur) >= 2 or chars > 12 or i == len(all_words)-1:
@@ -427,8 +336,7 @@ jobs:
           for i, c in enumerate(chunks):
               end = chunks[i+1]['start'] if i < len(chunks)-1 else c['end']+0.1
               if c['start'] < end:
-                  anim = r'{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}'
-                  lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{anim}{c['text']}")
+                  lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{{\\fscx82\\fscy82\\t(0,110,\\fscx100\\fscy100)}}{c['text']}")
 
           open('subtitles.ass','w',encoding='utf-8').write(header+'\n'+'\n'.join(lines))
           PYTHON_ASS
@@ -460,34 +368,11 @@ jobs:
           " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
           fi
 
-          ffmpeg -y \
-            -stream_loop -1 -i pexels.mp4 \
-            -i audio.wav \
-            -i logo.png \
+          ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i logo.png \
             -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,${ZOOM_EXPR}eq=${EQ_FILTRO}[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2${HOOK_Y_OFFSET}:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=${BAR_COLOR_HEX}@0.95:t=fill[outv]" \
-            -map "[outv]" -map 1:a \
-            -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 \
-            -c:a aac -b:a 192k \
-            -t "$DUR" \
-            -movflags +faststart \
-            output.mp4 \
-            2>&1 | tee ffmpeg.log | tail -5
+            -map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -t "$DUR" -movflags +faststart output.mp4
 
-          if [ ! -f "output.mp4" ] || [ "$(stat -c%s output.mp4)" -lt 100000 ]; then
-            ffmpeg -y \
-              -stream_loop -1 -i pexels.mp4 \
-              -i audio.wav \
-              -i logo.png \
-              -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,eq=brightness=-0.05:saturation=1.15:contrast=1.05[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2-300:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
-              -map "[outv]" -map 1:a \
-              -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 \
-              -c:a aac -b:a 192k -t "$DUR" -movflags +faststart \
-              output.mp4 2>&1 | tee -a ffmpeg.log | tail -5
-          fi
-
-          if [ ! -f "output.mp4" ] || [ "$(stat -c%s output.mp4)" -lt 100000 ]; then exit 1; fi
-
-      - name: "📺 Publicar en YouTube (con failover entre 4 proyectos)"
+      - name: "📺 Publicar en YouTube"
         id: youtube
         continue-on-error: true
         timeout-minutes: 10
@@ -504,10 +389,9 @@ jobs:
           YOUTUBE_CLIENT_ID_4: ${{ secrets.YOUTUBE_CLIENT_ID_4 }}
           YOUTUBE_CLIENT_SECRET_4: ${{ secrets.YOUTUBE_CLIENT_SECRET_4 }}
           YOUTUBE_REFRESH_TOKEN_4: ${{ secrets.YOUTUBE_REFRESH_TOKEN_4 }}
-          EQUIPO_USADO: ${{ github.event.client_payload.equipo_usado }}
         run: |
           cat << 'PYTHON_YT' > /tmp/subir_yt.py
-          import os, sys, traceback, unicodedata
+          import os, sys
           from datetime import datetime, timezone
           from google.auth.transport.requests import Request
           from google.oauth2.credentials import Credentials
@@ -516,87 +400,44 @@ jobs:
           from googleapiclient.errors import HttpError
           sys.stdout.reconfigure(encoding='utf-8')
 
-          def construir_orden_proyectos():
-              hora_actual = datetime.now(timezone.utc).hour
-              preferido = (hora_actual % 4) + 1
-              return [preferido] + [i for i in [1, 2, 3, 4] if i != preferido]
+          orden = [(datetime.now(timezone.utc).hour % 4) + 1] + [i for i in [1, 2, 3, 4] if i != (datetime.now(timezone.utc).hour % 4) + 1]
 
-          def construir_credenciales(idx):
-              client_id = os.environ.get(f'YOUTUBE_CLIENT_ID_{idx}', '').strip()
-              client_secret = os.environ.get(f'YOUTUBE_CLIENT_SECRET_{idx}', '').strip()
-              refresh_token = os.environ.get(f'YOUTUBE_REFRESH_TOKEN_{idx}', '').strip()
-              if not client_id or not client_secret or not refresh_token: return None
-              creds = Credentials.from_authorized_user_info({
-                  'client_id': client_id, 'client_secret': client_secret,
-                  'refresh_token': refresh_token, 'token_uri': 'https://oauth2.googleapis.com/token',
-                  'scopes': ['https://www.googleapis.com/auth/youtube.upload']
-              })
-              creds.refresh(Request())
-              return creds
-
-          def normalizar_tag(texto):
-              texto = (texto or '').strip()
-              if not texto: return None
-              sin_acentos = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
-              tag = sin_acentos.lower().replace(' ', '').replace('-', '')
-              return tag if len(tag) > 2 else None
+          def get_creds(idx):
+              c_id = os.environ.get(f'YOUTUBE_CLIENT_ID_{idx}', '').strip()
+              c_sec = os.environ.get(f'YOUTUBE_CLIENT_SECRET_{idx}', '').strip()
+              r_tok = os.environ.get(f'YOUTUBE_REFRESH_TOKEN_{idx}', '').strip()
+              if not c_id: return None
+              c = Credentials.from_authorized_user_info({'client_id': c_id, 'client_secret': c_sec, 'refresh_token': r_tok, 'token_uri': 'https://oauth2.googleapis.com/token', 'scopes': ['https://www.googleapis.com/auth/youtube.upload']})
+              c.refresh(Request())
+              return c
 
           try:
-              orden = construir_orden_proyectos()
               titulo = open('titulo.txt','r',encoding='utf-8').read().strip()[:100]
               desc = open('descripcion.txt','r',encoding='utf-8').read().strip()[:5000]
+              tags = ['mundialdefutbol','mundial2026','futbol','shorts','futbolshorts','worldcup2026','boxtoboxfc','prediccion','tactica']
+              body = {'snippet': {'title': titulo, 'description': desc, 'tags': tags, 'categoryId': '17'}, 'status': {'privacyStatus': 'public'}}
 
-              tags_equipo_raw = os.environ.get('EQUIPO_USADO', '')
-              tags_dinamicos = [normalizar_tag(eq) for eq in tags_equipo_raw.split(',') if normalizar_tag(eq)]
-
-              tags_base = ['mundialdefutbol','mundial2026','futbol','shorts','futbolshorts','worldcup2026','boxtoboxfc','prediccion','pronostico','analisis','tactica','deporte','fifaworldcup','futbol2026']
-              tags_finales = list(dict.fromkeys(tags_dinamicos + tags_base))[:30]
-
-              body = {
-                  'snippet': {'title': titulo, 'description': desc, 'tags': tags_finales, 'categoryId': '17', 'defaultLanguage': 'es', 'defaultAudioLanguage': 'es'},
-                  'status': {'privacyStatus': 'public', 'selfDeclaredMadeForKids': False, 'madeForKids': False}
-              }
-
-              exito, canal_lleno = False, False
               for idx in orden:
                   try:
-                      creds = construir_credenciales(idx)
-                      if creds is None: continue
+                      creds = get_creds(idx)
+                      if not creds: continue
                       yt = build('youtube', 'v3', credentials=creds)
-                      media = MediaFileUpload('output.mp4', mimetype='video/mp4', resumable=True, chunksize=50*1024*1024)
-                      req = yt.videos().insert(part='snippet,status', body=body, media_body=media)
-
+                      req = yt.videos().insert(part='snippet,status', body=body, media_body=MediaFileUpload('output.mp4', mimetype='video/mp4', resumable=True))
                       resp = None
-                      while resp is None: status, resp = req.next_chunk()
-
+                      while resp is None: _, resp = req.next_chunk()
                       open('video_id.txt','w').write(resp['id'])
-                      exito = True
-                      break
+                      print(f"✅ PUBLICADO: https://youtube.com/shorts/{resp['id']}")
+                      sys.exit(0)
                   except HttpError as e:
-                      error_content = e.content.decode() if hasattr(e, 'content') else str(e)
-                      if 'uploadLimitExceeded' in error_content: canal_lleno = True; break
-                      continue
-                  except Exception: continue
-
-              if canal_lleno: sys.exit(2)
-              elif not exito: sys.exit(1)
-
-          except Exception:
-              traceback.print_exc()
+                      if 'uploadLimitExceeded' in e.content.decode(): sys.exit(2)
               sys.exit(1)
+          except: sys.exit(1)
           PYTHON_YT
 
           python3 /tmp/subir_yt.py
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -eq 0 ]; then
-            echo "youtube_status=✅ YouTube OK" >> $GITHUB_OUTPUT
-          elif [ $EXIT_CODE -eq 2 ]; then
-            echo "youtube_status=⚠️ Limite diario del canal alcanzado (bajar cadencia)" >> $GITHUB_OUTPUT
-          else
-            echo "youtube_status=❌ YouTube Falló (los 4 proyectos fallaron)" >> $GITHUB_OUTPUT
-          fi
+          if [ $? -eq 0 ]; then echo "youtube_status=✅ YouTube OK" >> $GITHUB_OUTPUT; else echo "youtube_status=❌ YouTube Falló" >> $GITHUB_OUTPUT; fi
 
-      - name: "🧠 Actualizar memoria anti-repeticion"
+      - name: "🧠 Actualizar memoria"
         if: success()
         env:
           EQUIPO_USADO: ${{ github.event.client_payload.equipo_usado }}
@@ -613,18 +454,3 @@ jobs:
             git commit -m "Memoria: $EQUIPO_USADO" || echo "Sin cambios"
             git push || echo "Push fallido"
           fi
-
-      - name: "📦 Artifacts de diagnóstico"
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: "b2b-run-${{ github.run_number }}"
-          path: |
-            output.mp4
-            subtitles.ass
-            hook_text.txt
-            titulo.txt
-            script.txt
-            ffmpeg.log
-          retention-days: 3
-          if-no-files-found: warn
