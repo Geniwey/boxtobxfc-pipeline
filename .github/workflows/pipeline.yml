@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v11.0 (IMAGE PURIFIER + ZERO PEXELS)
+# ⚽ BOX TO BOX FC - PIPELINE v12.0 (FFMPEG CROP FIX + ZERO PEXELS)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v11.0"
+name: "Box to Box FC - Pipeline v12.0"
 
 concurrency:
   group: render-b2b-unico
@@ -220,8 +220,8 @@ jobs:
                       f.write(f"duration {dur_img:.3f}\n")
                   f.write(f"file '{ia_images[-1]}'\n")
               
-              # Renderizado seguro con errores visibles en consola si falla
-              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=crop,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4')
+              # LA CORRECCIÓN EXACTA ESTÁ AQUÍ. Cambiado "crop" por "increase,crop=1080:1920"
+              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
               
               if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 50000:
                   print("✅ Fondo IA generado y blindado con éxito!")
