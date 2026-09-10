@@ -1,4 +1,3 @@
-Brasil
 Arsenal
 Colombia
 Tchouaméni
@@ -8,3 +7,4 @@ Kubo
 Tebas
 Rodri
 Arribas
+Uruguay
