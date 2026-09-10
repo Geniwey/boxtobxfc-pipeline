@@ -1,4 +1,3 @@
-Borussia Dortmund
 Marc Casadó
 Gavi
 Real Madrid
@@ -8,3 +7,4 @@ Alemania
 Geoff Hurst
 Liverpool
 Barcelona
+Paris Saint-Germain
