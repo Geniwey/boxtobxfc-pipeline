@@ -1,4 +1,3 @@
-Tchouaméni
 Juventus
 Florentino
 Kubo
@@ -8,3 +7,4 @@ Arribas
 Uruguay
 Borussia Dortmund
 Marc Casadó
+Gavi
