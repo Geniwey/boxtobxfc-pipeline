@@ -1,4 +1,3 @@
-Brasil
 Manchester City
 Barcelona
 Inglaterra
@@ -8,3 +7,4 @@ Hakan Sukur
 Alemania
 Portugal
 Argentina
+Atletico de Madrid
