@@ -1,4 +1,3 @@
-Manchester City
 Barcelona
 Inglaterra
 Grecia
@@ -8,3 +7,4 @@ Alemania
 Portugal
 Argentina
 Atletico de Madrid
+Inter de Milan
