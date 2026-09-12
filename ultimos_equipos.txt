@@ -1,4 +1,3 @@
-Barcelona
 Alemania
 Hakan Sukur
 Atletico de Madrid
@@ -8,3 +7,4 @@ Liverpool
 Brasil
 Argentina
 Inglaterra
+Madrid
