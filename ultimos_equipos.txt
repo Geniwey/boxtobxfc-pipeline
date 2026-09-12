@@ -1,4 +1,3 @@
-Just Fontaine
 AC Milan
 Paris Saint-Germain
 Barcelona
@@ -8,3 +7,4 @@ Atletico de Madrid
 Sevilla
 Grecia
 Liverpool
+Brasil
