@@ -1,4 +1,3 @@
-Inter de Milan
 Leicester City
 Real Madrid
 Inglaterra
@@ -8,3 +7,4 @@ Just Fontaine
 AC Milan
 Paris Saint-Germain
 Barcelona
+Alemania
