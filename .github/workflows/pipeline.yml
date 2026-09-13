@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v13.2 (TRINIDAD PURA: GOOGLE USA -> HF -> PEXELS)
+# ⚽ BOX TO BOX FC - PIPELINE v13.3 (NUEVA API GOOGLE INTERACTIONS + HF + PEXELS)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v13.2"
+name: "Box to Box FC - Pipeline v13.3"
 
 concurrency:
   group: render-b2b-unico
@@ -111,7 +111,7 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Bucle Titanio (Proxy USA -> Google -> HF -> Pexels)"
+      - name: "🎙️🎨 Generador Visual (Google Gemini 3.1 -> HF -> Pexels)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
@@ -164,21 +164,6 @@ jobs:
                   print(f"   ⚠️ Error de formato en {ruta}: {e}")
                   return False
 
-          def obtener_proxies_usa():
-              print("   🕵️ Buscando red de proxies (USA) para enmascarar la IP...")
-              try:
-                  res = requests.get("https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=5000&country=US&ssl=all&anonymity=all", timeout=10)
-                  if res.status_code == 200:
-                      lista = [{"http": f"http://{p.strip()}", "https": f"http://{p.strip()}"} for p in res.text.split('\n') if p.strip()]
-                      random.shuffle(lista)
-                      print(f"   ✅ Se encontraron {len(lista)} nodos proxy en USA.")
-                      return lista
-              except: 
-                  print("   ⚠️ Fallo al obtener red proxy, se procederá sin proxy.")
-              return []
-
-          proxies_usa = obtener_proxies_usa()
-
           def generar_imagen_hf(prompt_text, index):
               if not hf_key: 
                   print("   ⚠️ No hay API KEY de Hugging Face. Abortando Fase 2.")
@@ -212,46 +197,76 @@ jobs:
               if not google_key: return generar_imagen_hf(prompt_text, index)
               path = f"ia_img_{index}.jpg"
               
-              modelos = ["imagen-3.0-generate-002", "imagen-3.0-generate-001", "imagen-3.0-generate"]
-              headers = {'Content-Type': 'application/json'}
-              data = {
-                  "instances": [{"prompt": prompt_text}],
-                  "parameters": {"sampleCount": 1, "aspectRatio": "9:16"}
+              # LA CLAVE: Nuevos modelos (Sept 2026) y nueva API de interacciones
+              modelos = ["gemini-3.1-flash-image", "gemini-3.1-flash-lite-image", "gemini-3-pro-image"]
+              url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+              
+              headers = {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': google_key.strip()
+              }
+              
+              data_payload = {
+                  "input": [{"type": "text", "text": prompt_text}],
+                  "response_format": {
+                      "type": "image",
+                      "aspect_ratio": "9:16"
+                  }
               }
 
               for modelo in modelos:
-                  print(f"   ▶️ [FASE 1] Solicitando imagen a Google Flow ({modelo})...")
-                  url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:predict?key={google_key}"
+                  print(f"   ▶️ [FASE 1] Solicitando imagen a la nueva API de Google ({modelo})...")
+                  data_payload["model"] = modelo
                   
                   for intento in range(2):
-                      proxy_actual = proxies_usa.pop() if proxies_usa else None
                       try:
-                          res = requests.post(url, headers=headers, json=data, timeout=45, proxies=proxy_actual)
+                          res = requests.post(url, headers=headers, json=data_payload, timeout=60)
                           if res.status_code == 200:
                               response_data = res.json()
-                              if 'predictions' in response_data and len(response_data['predictions']) > 0:
-                                  b64_string = response_data['predictions'][0]['bytesBase64Encoded']
+                              
+                              # Buscador recursivo de Base64 para extraer la imagen 
+                              # (por si Google vuelve a cambiar la estructura del JSON en el futuro)
+                              def find_b64(obj):
+                                  if isinstance(obj, dict):
+                                      if 'data' in obj and isinstance(obj['data'], str) and len(obj['data']) > 1000:
+                                          return obj['data']
+                                      if 'bytesBase64Encoded' in obj and isinstance(obj['bytesBase64Encoded'], str):
+                                          return obj['bytesBase64Encoded']
+                                      for k, v in obj.items():
+                                          found = find_b64(v)
+                                          if found: return found
+                                  elif isinstance(obj, list):
+                                      for item in obj:
+                                          found = find_b64(item)
+                                          if found: return found
+                                  return None
+                                  
+                              b64_string = find_b64(response_data)
+                              
+                              if b64_string:
                                   img_data = base64.b64decode(b64_string)
                                   with open(path, 'wb') as f:
                                       f.write(img_data)
                                   if purificar_imagen(path):
-                                      print(f"   ✅ Éxito Google Flow ({modelo}). IP encubierta.")
+                                      print(f"   ✅ Éxito espectacular con Google ({modelo}).")
                                       return path
-                          elif res.status_code == 403:
-                              print(f"   🚨 BLOQUEO GOOGLE (403): Bloqueo Regional. Saltando Proxy o cambiando a Fase 2...")
-                              # Continuamos el bucle para probar otro proxy. Si se acaban, irá a HF al final.
                           elif res.status_code == 429:
                               print("   ⏳ Límite alcanzado (429). Esperando 15s...")
                               time.sleep(15)
                           elif res.status_code == 404:
-                              break 
+                              print(f"   ❌ Modelo {modelo} no encontrado (404). Pasando al siguiente modelo...")
+                              break # Rompe los reintentos y salta al siguiente modelo de la lista
+                          else:
+                              print(f"   ❌ Error API Google: HTTP {res.status_code} - {res.text[:100]}")
                       except Exception as e:
-                          print(f"   ❌ Fallo de proxy/red Google. Buscando otro nodo...")
+                          print(f"   ❌ Fallo de red Google: {e}")
                       time.sleep(3)
+              
+              # Si todos los modelos de la nueva API fallan, pasamos a HF
               return generar_imagen_hf(prompt_text, index)
 
           if prompts:
-              print(f"🛡️ Iniciando Blindaje Estricto (Google USA -> Hugging Face)...")
+              print(f"🛡️ Iniciando Blindaje Estricto (Google -> HF)...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
                   resultado = generar_imagen_google(p, i)
@@ -264,7 +279,6 @@ jobs:
                       print("   ⏱️ Pausa de seguridad anti-saturación de red (8s)...")
                       time.sleep(8)
 
-          # Montaje de FFMPEG solo si tenemos al menos 4 imágenes de calidad
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
                   ia_images.append(ia_images[-1])
