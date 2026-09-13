@@ -1,5 +1,5 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v12.0 (GOOGLE FLOW + PEXELS FALLBACK)
+# ⚽ BOX TO BOX FC - PIPELINE v12.0 (GOOGLE FLOW + PEXELS FALLBACK + VOZ FIJA)
 # ==============================================================================
 
 name: "Box to Box FC - Pipeline v12.0"
@@ -120,11 +120,8 @@ jobs:
           GOOGLE_API_KEY_2: ${{ secrets.GOOGLE_API_KEY_2 }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
-          VOCES=("es-MX-JorgeNeural" "es-ES-AlvaroNeural" "es-AR-TomasNeural" "es-CO-GonzaloNeural" "es-US-AlonsoNeural")
-          VOZ_ELEGIDA=${VOCES[$RANDOM % ${#VOCES[@]}]}
-          
           AUDIO_OK=false
-          edge-tts --voice "$VOZ_ELEGIDA" --rate="+8%" --pitch="-2Hz" --file script_audio.txt --write-media audio.mp3 2>/dev/null || true
+          edge-tts --voice "es-ES-AlvaroNeural" --rate="+15%" --volume="+10%" --file script_audio.txt --write-media audio.mp3 2>/dev/null || true
           if [ "$(stat -c%s audio.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then AUDIO_OK=true; fi
           if [ "$AUDIO_OK" = "false" ]; then python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio.mp3')" 2>/dev/null || true; fi
 
