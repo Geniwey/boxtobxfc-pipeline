@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v12.1 (GOOGLE FLOW DINÁMICO + PEXELS + VOZ FIJA)
+# ⚽ BOX TO BOX FC - PIPELINE v13.2 (TRINIDAD PURA: GOOGLE USA -> HF -> PEXELS)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v12.0"
+name: "Box to Box FC - Pipeline v13.2"
 
 concurrency:
   group: render-b2b-unico
@@ -54,9 +54,9 @@ jobs:
 
           STYLE_INDEX=$((RANDOM % 3))
           echo "STYLE_INDEX=$STYLE_INDEX" >> $GITHUB_ENV
-          if [ "$STYLE_INDEX" = "0" ]; then echo "HIGHLIGHT_ASS_COLOR=&H0000D7FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFFD700" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.04:saturation=1.25:contrast=1.08" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-300" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=DORADO" >> $GITHUB_ENV
-          elif [ "$STYLE_INDEX" = "1" ]; then echo "HIGHLIGHT_ASS_COLOR=&H00FFE500&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0x00E5FF" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.08:saturation=0.95:contrast=1.15" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-260" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CIAN" >> $GITHUB_ENV
-          else echo "HIGHLIGHT_ASS_COLOR=&H000045FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFF4500" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.02:saturation=1.4:contrast=1.0" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-340" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CORAL" >> $GITHUB_ENV
+          if [ "$STYLE_INDEX" = "0" ]; then echo "HIGHLIGHT_ASS_COLOR=&H0000D7FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFFD700" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.04:saturation=1.25:contrast=1.08" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-300" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=DORADO"
+          elif [ "$STYLE_INDEX" = "1" ]; then echo "HIGHLIGHT_ASS_COLOR=&H00FFE500&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0x00E5FF" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.08:saturation=0.95:contrast=1.15" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-260" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CIAN"
+          else echo "HIGHLIGHT_ASS_COLOR=&H000045FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFF4500" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.02:saturation=1.4:contrast=1.0" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-340" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CORAL"
           fi
 
           MOVEMENT_INDEX=$((RANDOM % 4))
@@ -111,13 +111,14 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Bucle Titanio (Audio + Google Flow + Pexels)"
+      - name: "🎙️🎨 Generador Bucle Titanio (Proxy USA -> Google -> HF -> Pexels)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           GOOGLE_API_KEY_1: ${{ secrets.GOOGLE_API_KEY_1 }}
           GOOGLE_API_KEY_2: ${{ secrets.GOOGLE_API_KEY_2 }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           AUDIO_OK=false
@@ -139,16 +140,19 @@ jobs:
           sys.stdout.reconfigure(encoding='utf-8')
 
           dur_total = float(open('dur.txt').read().strip())
-          payload = json.load(open('payload.json', 'r', encoding='utf-8'))
-          prompts = payload.get('prompts_imagenes', [])
+          try:
+              payload = json.load(open('payload.json', 'r', encoding='utf-8'))
+              prompts = payload.get('prompts_imagenes', [])
+          except:
+              prompts = []
+              
           if not isinstance(prompts, list) or len(prompts) == 0:
               prompts = []
 
           api_keys = [k for k in [os.environ.get('GOOGLE_API_KEY_1'), os.environ.get('GOOGLE_API_KEY_2')] if k and k.strip()]
           google_key = random.choice(api_keys) if api_keys else None
-          if not google_key:
-              print("⚠️ ADVERTENCIA: No hay API Keys de Google válidas. Activando Pexels...")
-
+          hf_key = os.environ.get('HUGGINGFACE_API_KEY', '').strip()
+          
           ia_images = []
 
           def purificar_imagen(ruta):
@@ -160,8 +164,52 @@ jobs:
                   print(f"   ⚠️ Error de formato en {ruta}: {e}")
                   return False
 
+          def obtener_proxies_usa():
+              print("   🕵️ Buscando red de proxies (USA) para enmascarar la IP...")
+              try:
+                  res = requests.get("https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=5000&country=US&ssl=all&anonymity=all", timeout=10)
+                  if res.status_code == 200:
+                      lista = [{"http": f"http://{p.strip()}", "https": f"http://{p.strip()}"} for p in res.text.split('\n') if p.strip()]
+                      random.shuffle(lista)
+                      print(f"   ✅ Se encontraron {len(lista)} nodos proxy en USA.")
+                      return lista
+              except: 
+                  print("   ⚠️ Fallo al obtener red proxy, se procederá sin proxy.")
+              return []
+
+          proxies_usa = obtener_proxies_usa()
+
+          def generar_imagen_hf(prompt_text, index):
+              if not hf_key: 
+                  print("   ⚠️ No hay API KEY de Hugging Face. Abortando Fase 2.")
+                  return None
+              path = f"ia_img_{index}.jpg"
+              print(f"   ▶️ [FASE 2] Solicitando imagen a Hugging Face (FLUX)...")
+              
+              url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+              headers = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
+              data = {"inputs": prompt_text}
+
+              for intento in range(3):
+                  try:
+                      res = requests.post(url, headers=headers, json=data, timeout=60)
+                      if res.status_code == 200:
+                          with open(path, 'wb') as f:
+                              f.write(res.content)
+                          if purificar_imagen(path):
+                              print(f"   ✅ Éxito Hugging Face.")
+                              return path
+                      elif res.status_code == 503:
+                          print("   ⏳ [Blindaje HF] Esperando 20 segundos para cargar modelo...")
+                          time.sleep(20)
+                          continue
+                  except Exception as e:
+                      pass
+                  time.sleep(5)
+              return None
+
           def generar_imagen_google(prompt_text, index):
-              if not google_key: return None
+              if not google_key: return generar_imagen_hf(prompt_text, index)
               path = f"ia_img_{index}.jpg"
               
               modelos = ["imagen-3.0-generate-002", "imagen-3.0-generate-001", "imagen-3.0-generate"]
@@ -172,12 +220,13 @@ jobs:
               }
 
               for modelo in modelos:
-                  print(f"   ▶️ Solicitando imagen {index+1} a Google Flow ({modelo})...")
+                  print(f"   ▶️ [FASE 1] Solicitando imagen a Google Flow ({modelo})...")
                   url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:predict?key={google_key}"
                   
                   for intento in range(2):
+                      proxy_actual = proxies_usa.pop() if proxies_usa else None
                       try:
-                          res = requests.post(url, headers=headers, json=data, timeout=60)
+                          res = requests.post(url, headers=headers, json=data, timeout=45, proxies=proxy_actual)
                           if res.status_code == 200:
                               response_data = res.json()
                               if 'predictions' in response_data and len(response_data['predictions']) > 0:
@@ -186,40 +235,41 @@ jobs:
                                   with open(path, 'wb') as f:
                                       f.write(img_data)
                                   if purificar_imagen(path):
-                                      print(f"   ✅ Éxito Google Flow ({modelo}).")
+                                      print(f"   ✅ Éxito Google Flow ({modelo}). IP encubierta.")
                                       return path
+                          elif res.status_code == 403:
+                              print(f"   🚨 BLOQUEO GOOGLE (403): Bloqueo Regional. Saltando Proxy o cambiando a Fase 2...")
+                              # Continuamos el bucle para probar otro proxy. Si se acaban, irá a HF al final.
                           elif res.status_code == 429:
                               print("   ⏳ Límite alcanzado (429). Esperando 15s...")
                               time.sleep(15)
                           elif res.status_code == 404:
-                              print(f"   ❌ Modelo {modelo} inactivo (404). Saltando al siguiente modelo...")
                               break 
-                          else:
-                              print(f"   ❌ Error API Google: HTTP {res.status_code}")
                       except Exception as e:
-                          print(f"   ❌ Fallo de red: {e}")
+                          print(f"   ❌ Fallo de proxy/red Google. Buscando otro nodo...")
                       time.sleep(3)
-              return None
+              return generar_imagen_hf(prompt_text, index)
 
-          if prompts and google_key:
-              print(f"🎨 Generando {len(prompts)} infografías con Google AI Studio...")
+          if prompts:
+              print(f"🛡️ Iniciando Blindaje Estricto (Google USA -> Hugging Face)...")
               for i, p in enumerate(prompts):
-                  print(f"\n🎬 Escena {i+1}...")
+                  print(f"\n🎬 Generando Escena {i+1}...")
                   resultado = generar_imagen_google(p, i)
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Fallo crítico en escena {i+1}.")
+                      print(f" ❌ Fallo en escena {i+1} (Google y HF no respondieron).")
                   
                   if i < len(prompts) - 1:
-                      print("   ⏱️ Pausa anti-saturación (8s)...")
+                      print("   ⏱️ Pausa de seguridad anti-saturación de red (8s)...")
                       time.sleep(8)
 
+          # Montaje de FFMPEG solo si tenemos al menos 4 imágenes de calidad
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
                   ia_images.append(ia_images[-1])
                   
-              print("\n🎬 Montando infografías de Google en vídeo...")
+              print("\n🎬 Montando infografías en vídeo...")
               dur_img = dur_total / len(ia_images)
               with open('ia_list.txt', 'w', encoding='utf-8') as f:
                   for img in ia_images:
@@ -230,10 +280,10 @@ jobs:
               os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
               
               if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 50000:
-                  print("✅ Fondo Infográfico generado con éxito!")
+                  print("✅ Fondo Infográfico ensamblado con éxito!")
                   sys.exit(0)
 
-          print("\n⚠️ Activando Paracaídas. Rescatando vídeos de Pexels...")
+          print("\n⚠️ [FASE 3] Activando Rescate Pexels (Las IAs fallaron)...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
           query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium'
           downloaded = []
