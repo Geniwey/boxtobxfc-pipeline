@@ -1,5 +1,5 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v12.0 (FFMPEG CROP FIX + ZERO PEXELS)
+# ⚽ BOX TO BOX FC - PIPELINE v12.0 (GOOGLE FLOW + PEXELS FALLBACK)
 # ==============================================================================
 
 name: "Box to Box FC - Pipeline v12.0"
@@ -111,11 +111,13 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Bucle Titanio (Audio + Imágenes Exactas)"
+      - name: "🎙️🎨 Generador Bucle Titanio (Audio + Google Flow + Pexels)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          GOOGLE_API_KEY_1: ${{ secrets.GOOGLE_API_KEY_1 }}
+          GOOGLE_API_KEY_2: ${{ secrets.GOOGLE_API_KEY_2 }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           VOCES=("es-MX-JorgeNeural" "es-ES-AlvaroNeural" "es-AR-TomasNeural" "es-CO-GonzaloNeural" "es-US-AlonsoNeural")
@@ -135,20 +137,20 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, requests, random, urllib.parse, time
+          import os, sys, json, requests, random, time, base64
           from PIL import Image
           sys.stdout.reconfigure(encoding='utf-8')
 
           dur_total = float(open('dur.txt').read().strip())
           payload = json.load(open('payload.json', 'r', encoding='utf-8'))
           prompts = payload.get('prompts_imagenes', [])
-          if not isinstance(prompts, list): prompts = []
+          if not isinstance(prompts, list) or len(prompts) == 0:
+              prompts = []
 
-          USER_AGENTS = [
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
-              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
-          ]
+          api_keys = [k for k in [os.environ.get('GOOGLE_API_KEY_1'), os.environ.get('GOOGLE_API_KEY_2')] if k and k.strip()]
+          google_key = random.choice(api_keys) if api_keys else None
+          if not google_key:
+              print("⚠️ ADVERTENCIA: No hay API Keys de Google válidas. Activando Pexels...")
 
           ia_images = []
 
@@ -158,61 +160,66 @@ jobs:
                   img.save(ruta, 'JPEG', quality=95)
                   return True
               except Exception as e:
-                  print(f"   ⚠️ Error de formato corrupto en {ruta}: {e}")
+                  print(f"   ⚠️ Error de formato en {ruta}: {e}")
                   return False
 
-          def generar_imagen(p_original, index):
+          def generar_imagen_google(prompt_text, index):
+              if not google_key: return None
               path = f"ia_img_{index}.jpg"
-              p_medio = p_original.split(", cinematic")[0] + " cinematic lighting 8k"
-              p_basico = " ".join(p_original.split(" ")[:6]) + " football match stadium 8k"
+              print(f"   ▶️ Solicitando imagen {index+1} a Google Flow API...")
+              
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={google_key}"
+              headers = {'Content-Type': 'application/json'}
+              data = {
+                  "instances": [{"prompt": prompt_text}],
+                  "parameters": {
+                      "sampleCount": 1,
+                      "aspectRatio": "9:16"
+                  }
+              }
 
-              for ronda in range(15):
-                  print(f"   ▶️ Ronda {ronda+1}/15 para escena {index+1}...")
-                  prompt_actual = p_original if ronda < 5 else (p_medio if ronda < 10 else p_basico)
-                  safe_p = urllib.parse.quote(prompt_actual.strip())
-
+              for intento in range(3):
                   try:
-                      modelo = random.choice(['flux', 'realism', 'turbo'])
-                      r = requests.get(f"https://image.pollinations.ai/prompt/{safe_p}?width=1080&height=1920&nologo=true&model={modelo}&seed={random.randint(1,99999)}", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
-                      if r.status_code == 200 and len(r.content) > 30000:
-                          with open(path, 'wb') as f: f.write(r.content)
-                          if purificar_imagen(path):
-                              print(f"   ✅ Éxito Pollinations ({modelo}) y Purificada")
-                              return path
-                  except: pass
-                  time.sleep(2)
-
-                  try:
-                      r = requests.get(f"https://api.airforce/v1/imagine2?prompt={safe_p}&size=1080x1920", headers={'User-Agent': random.choice(USER_AGENTS)}, timeout=45)
-                      if r.status_code == 200 and len(r.content) > 20000:
-                          with open(path, 'wb') as f: f.write(r.content)
-                          if purificar_imagen(path):
-                              print("   ✅ Éxito Airforce y Purificada")
-                              return path
-                  except: pass
-                  time.sleep(2)
-
-                  print("   ⏳ Reintentando...")
+                      res = requests.post(url, headers=headers, json=data, timeout=60)
+                      if res.status_code == 200:
+                          response_data = res.json()
+                          if 'predictions' in response_data and len(response_data['predictions']) > 0:
+                              b64_string = response_data['predictions'][0]['bytesBase64Encoded']
+                              img_data = base64.b64decode(b64_string)
+                              with open(path, 'wb') as f:
+                                  f.write(img_data)
+                              if purificar_imagen(path):
+                                  print("   ✅ Éxito Google Flow (Imagen 3).")
+                                  return path
+                      elif res.status_code == 429:
+                          print("   ⏳ Límite alcanzado (429). Esperando 15s...")
+                          time.sleep(15)
+                      else:
+                          print(f"   ❌ Error API Google: HTTP {res.status_code}")
+                  except Exception as e:
+                      print(f"   ❌ Fallo de red: {e}")
                   time.sleep(5)
               return None
 
-          if prompts:
-              print(f"🎨 Forzando extracción de {len(prompts)} escenas únicas (SIN CLONAR)...")
+          if prompts and google_key:
+              print(f"🎨 Generando {len(prompts)} infografías con Google AI Studio...")
               for i, p in enumerate(prompts):
-                  print(f"\n🎬 Generando escena {i+1}...")
-                  resultado = generar_imagen(p, i)
+                  print(f"\n🎬 Escena {i+1}...")
+                  resultado = generar_imagen_google(p, i)
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Fallo crítico en escena {i+1}. Usando comodín.")
-                      res_emergencia = generar_imagen("epic dramatic football stadium crowds night lights highly detailed 8k", i)
-                      if res_emergencia: ia_images.append(res_emergencia)
+                      print(f" ❌ Fallo crítico en escena {i+1}.")
+                  
+                  if i < len(prompts) - 1:
+                      print("   ⏱️ Pausa anti-saturación (8s)...")
+                      time.sleep(8)
 
-          if len(ia_images) > 0:
+          if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
                   ia_images.append(ia_images[-1])
                   
-              print("\n🎬 Sincronía visual perfecta lograda. Montando vídeo...")
+              print("\n🎬 Montando infografías de Google en vídeo...")
               dur_img = dur_total / len(ia_images)
               with open('ia_list.txt', 'w', encoding='utf-8') as f:
                   for img in ia_images:
@@ -220,16 +227,13 @@ jobs:
                       f.write(f"duration {dur_img:.3f}\n")
                   f.write(f"file '{ia_images[-1]}'\n")
               
-              # LA CORRECCIÓN EXACTA ESTÁ AQUÍ. Cambiado "crop" por "increase,crop=1080:1920"
               os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
               
               if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 50000:
-                  print("✅ Fondo IA generado y blindado con éxito!")
+                  print("✅ Fondo Infográfico generado con éxito!")
                   sys.exit(0)
-              else:
-                  print("❌ FFMPEG falló al montar el vídeo o pesa muy poco.")
 
-          print("\n⚠️ Apocalipsis IA mundial. Rescatando Pexels...")
+          print("\n⚠️ Activando Paracaídas. Rescatando vídeos de Pexels...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
           query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium'
           downloaded = []
