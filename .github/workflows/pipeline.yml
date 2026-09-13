@@ -1,5 +1,5 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v12.0 (GOOGLE FLOW + PEXELS FALLBACK + VOZ FIJA)
+# ⚽ BOX TO BOX FC - PIPELINE v12.1 (GOOGLE FLOW DINÁMICO + PEXELS + VOZ FIJA)
 # ==============================================================================
 
 name: "Box to Box FC - Pipeline v12.0"
@@ -163,39 +163,42 @@ jobs:
           def generar_imagen_google(prompt_text, index):
               if not google_key: return None
               path = f"ia_img_{index}.jpg"
-              print(f"   ▶️ Solicitando imagen {index+1} a Google Flow API...")
               
-              url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={google_key}"
+              modelos = ["imagen-3.0-generate-002", "imagen-3.0-generate-001", "imagen-3.0-generate"]
               headers = {'Content-Type': 'application/json'}
               data = {
                   "instances": [{"prompt": prompt_text}],
-                  "parameters": {
-                      "sampleCount": 1,
-                      "aspectRatio": "9:16"
-                  }
+                  "parameters": {"sampleCount": 1, "aspectRatio": "9:16"}
               }
 
-              for intento in range(3):
-                  try:
-                      res = requests.post(url, headers=headers, json=data, timeout=60)
-                      if res.status_code == 200:
-                          response_data = res.json()
-                          if 'predictions' in response_data and len(response_data['predictions']) > 0:
-                              b64_string = response_data['predictions'][0]['bytesBase64Encoded']
-                              img_data = base64.b64decode(b64_string)
-                              with open(path, 'wb') as f:
-                                  f.write(img_data)
-                              if purificar_imagen(path):
-                                  print("   ✅ Éxito Google Flow (Imagen 3).")
-                                  return path
-                      elif res.status_code == 429:
-                          print("   ⏳ Límite alcanzado (429). Esperando 15s...")
-                          time.sleep(15)
-                      else:
-                          print(f"   ❌ Error API Google: HTTP {res.status_code}")
-                  except Exception as e:
-                      print(f"   ❌ Fallo de red: {e}")
-                  time.sleep(5)
+              for modelo in modelos:
+                  print(f"   ▶️ Solicitando imagen {index+1} a Google Flow ({modelo})...")
+                  url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:predict?key={google_key}"
+                  
+                  for intento in range(2):
+                      try:
+                          res = requests.post(url, headers=headers, json=data, timeout=60)
+                          if res.status_code == 200:
+                              response_data = res.json()
+                              if 'predictions' in response_data and len(response_data['predictions']) > 0:
+                                  b64_string = response_data['predictions'][0]['bytesBase64Encoded']
+                                  img_data = base64.b64decode(b64_string)
+                                  with open(path, 'wb') as f:
+                                      f.write(img_data)
+                                  if purificar_imagen(path):
+                                      print(f"   ✅ Éxito Google Flow ({modelo}).")
+                                      return path
+                          elif res.status_code == 429:
+                              print("   ⏳ Límite alcanzado (429). Esperando 15s...")
+                              time.sleep(15)
+                          elif res.status_code == 404:
+                              print(f"   ❌ Modelo {modelo} inactivo (404). Saltando al siguiente modelo...")
+                              break 
+                          else:
+                              print(f"   ❌ Error API Google: HTTP {res.status_code}")
+                      except Exception as e:
+                          print(f"   ❌ Fallo de red: {e}")
+                      time.sleep(3)
               return None
 
           if prompts and google_key:
