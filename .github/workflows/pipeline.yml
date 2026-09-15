@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v13.3 (NUEVA API GOOGLE INTERACTIONS + HF + PEXELS)
+# ⚽ BOX TO BOX FC - PIPELINE v16.0 (GRADIO -> HUGGING API -> PEXELS)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v13.3"
+name: "Box to Box FC - Pipeline v16.0"
 
 concurrency:
   group: render-b2b-unico
@@ -49,7 +49,8 @@ jobs:
           mkdir -p ~/.fonts
           wget -q --timeout=30 -O ~/.fonts/BebasNeue.ttf "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf ~/.fonts/BebasNeue.ttf 2>/dev/null; echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
           fc-cache -f 2>/dev/null
-          python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
+          # Instalamos gradio_client para la conexión hacker junto al resto de dependencias
+          python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
           STYLE_INDEX=$((RANDOM % 3))
@@ -111,13 +112,11 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual (Google Gemini 3.1 -> HF -> Pexels)"
+      - name: "🎙️🎨 Generador Visual Tridente (Gradio -> HF API -> Pexels)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          GOOGLE_API_KEY_1: ${{ secrets.GOOGLE_API_KEY_1 }}
-          GOOGLE_API_KEY_2: ${{ secrets.GOOGLE_API_KEY_2 }}
           HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
@@ -135,7 +134,7 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, requests, random, time, base64
+          import os, sys, json, requests, random, time, shutil
           from PIL import Image
           sys.stdout.reconfigure(encoding='utf-8')
 
@@ -149,10 +148,7 @@ jobs:
           if not isinstance(prompts, list) or len(prompts) == 0:
               prompts = []
 
-          api_keys = [k for k in [os.environ.get('GOOGLE_API_KEY_1'), os.environ.get('GOOGLE_API_KEY_2')] if k and k.strip()]
-          google_key = random.choice(api_keys) if api_keys else None
-          hf_key = os.environ.get('HUGGINGFACE_API_KEY', '').strip()
-          
+          hf_api_key = os.environ.get('HUGGINGFACE_API_KEY', '').strip()
           ia_images = []
 
           def purificar_imagen(ruta):
@@ -164,120 +160,81 @@ jobs:
                   print(f"   ⚠️ Error de formato en {ruta}: {e}")
                   return False
 
-          def generar_imagen_hf(prompt_text, index):
-              if not hf_key: 
-                  print("   ⚠️ No hay API KEY de Hugging Face. Abortando Fase 2.")
+          def fallback_hf_api(prompt_text, index):
+              if not hf_api_key:
+                  print("   ⚠️ No hay HUGGINGFACE_API_KEY configurada. Saltando Fase 2.")
                   return None
-              path = f"ia_img_{index}.jpg"
-              print(f"   ▶️ [FASE 2] Solicitando imagen a Hugging Face (FLUX)...")
-              
+                  
+              print(f"   ▶️ [FASE 2: HUGGING API] Usando clave oficial para la escena {index+1}...")
               url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
-              headers = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
+              headers = {"Authorization": f"Bearer {hf_api_key}", "Content-Type": "application/json"}
               data = {"inputs": prompt_text}
+              dest_path = f"ia_img_{index}.jpg"
 
               for intento in range(3):
                   try:
                       res = requests.post(url, headers=headers, json=data, timeout=60)
                       if res.status_code == 200:
-                          with open(path, 'wb') as f:
+                          with open(dest_path, 'wb') as f:
                               f.write(res.content)
-                          if purificar_imagen(path):
-                              print(f"   ✅ Éxito Hugging Face.")
-                              return path
+                          if purificar_imagen(dest_path):
+                              print(f"   ✅ Éxito con Hugging Face API.")
+                              return dest_path
                       elif res.status_code == 503:
-                          print("   ⏳ [Blindaje HF] Esperando 20 segundos para cargar modelo...")
-                          time.sleep(20)
+                          print("   ⏳ Modelo cargando. Esperando 15s...")
+                          time.sleep(15)
                           continue
-                  except Exception as e:
+                  except:
                       pass
                   time.sleep(5)
               return None
 
-          def generar_imagen_google(prompt_text, index):
-              if not google_key: return generar_imagen_hf(prompt_text, index)
-              path = f"ia_img_{index}.jpg"
+          def generar_imagen_hibrida(prompt_text, index):
+              print(f"   ▶️ [FASE 1: MOTOR INVISIBLE] Hackeando Gradio (FLUX) para escena {index+1}...")
               
-              # LA CLAVE: Nuevos modelos (Sept 2026) y nueva API de interacciones
-              modelos = ["gemini-3.1-flash-image", "gemini-3.1-flash-lite-image", "gemini-3-pro-image"]
-              url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+              for intento in range(2):
+                  try:
+                      from gradio_client import Client
+                      client = Client("black-forest-labs/FLUX.1-schnell")
+                      
+                      result = client.predict(
+                          prompt=prompt_text,
+                          seed=random.randint(1, 999999),
+                          randomize_seed=False,
+                          width=768,
+                          height=1344,
+                          num_inference_steps=4,
+                          api_name="/infer"
+                      )
+                      
+                      img_path = result[0] if isinstance(result, (tuple, list)) else result
+                      dest_path = f"ia_img_{index}.jpg"
+                      
+                      shutil.copy(img_path, dest_path)
+                      
+                      if purificar_imagen(dest_path):
+                          print(f"   ✅ Éxito absoluto con Motor Invisible.")
+                          return dest_path
+                  except Exception as e:
+                      print(f"   ⚠️ Servidor público saturado (Intento {intento+1}/2).")
+                      time.sleep(5)
               
-              headers = {
-                  'Content-Type': 'application/json',
-                  'x-goog-api-key': google_key.strip()
-              }
-              
-              data_payload = {
-                  "input": [{"type": "text", "text": prompt_text}],
-                  "response_format": {
-                      "type": "image",
-                      "aspect_ratio": "9:16"
-                  }
-              }
-
-              for modelo in modelos:
-                  print(f"   ▶️ [FASE 1] Solicitando imagen a la nueva API de Google ({modelo})...")
-                  data_payload["model"] = modelo
-                  
-                  for intento in range(2):
-                      try:
-                          res = requests.post(url, headers=headers, json=data_payload, timeout=60)
-                          if res.status_code == 200:
-                              response_data = res.json()
-                              
-                              # Buscador recursivo de Base64 para extraer la imagen 
-                              # (por si Google vuelve a cambiar la estructura del JSON en el futuro)
-                              def find_b64(obj):
-                                  if isinstance(obj, dict):
-                                      if 'data' in obj and isinstance(obj['data'], str) and len(obj['data']) > 1000:
-                                          return obj['data']
-                                      if 'bytesBase64Encoded' in obj and isinstance(obj['bytesBase64Encoded'], str):
-                                          return obj['bytesBase64Encoded']
-                                      for k, v in obj.items():
-                                          found = find_b64(v)
-                                          if found: return found
-                                  elif isinstance(obj, list):
-                                      for item in obj:
-                                          found = find_b64(item)
-                                          if found: return found
-                                  return None
-                                  
-                              b64_string = find_b64(response_data)
-                              
-                              if b64_string:
-                                  img_data = base64.b64decode(b64_string)
-                                  with open(path, 'wb') as f:
-                                      f.write(img_data)
-                                  if purificar_imagen(path):
-                                      print(f"   ✅ Éxito espectacular con Google ({modelo}).")
-                                      return path
-                          elif res.status_code == 429:
-                              print("   ⏳ Límite alcanzado (429). Esperando 15s...")
-                              time.sleep(15)
-                          elif res.status_code == 404:
-                              print(f"   ❌ Modelo {modelo} no encontrado (404). Pasando al siguiente modelo...")
-                              break # Rompe los reintentos y salta al siguiente modelo de la lista
-                          else:
-                              print(f"   ❌ Error API Google: HTTP {res.status_code} - {res.text[:100]}")
-                      except Exception as e:
-                          print(f"   ❌ Fallo de red Google: {e}")
-                      time.sleep(3)
-              
-              # Si todos los modelos de la nueva API fallan, pasamos a HF
-              return generar_imagen_hf(prompt_text, index)
+              # Si falla el Motor Invisible, activa el Paracaídas de la API oficial
+              print("   ❌ Motor Invisible bloqueado. Pasando al Escudo 2...")
+              return fallback_hf_api(prompt_text, index)
 
           if prompts:
-              print(f"🛡️ Iniciando Blindaje Estricto (Google -> HF)...")
+              print(f"🛡️ Arrancando Tridente Generativo (Gradio -> HF API -> Pexels)...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
-                  resultado = generar_imagen_google(p, i)
+                  resultado = generar_imagen_hibrida(p, i)
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Fallo en escena {i+1} (Google y HF no respondieron).")
+                      print(f" ❌ Fallo total en escena {i+1} (Todas las IAs rechazaron la conexión).")
                   
                   if i < len(prompts) - 1:
-                      print("   ⏱️ Pausa de seguridad anti-saturación de red (8s)...")
-                      time.sleep(8)
+                      time.sleep(3)
 
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
