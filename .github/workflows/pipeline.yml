@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v16.2 (ANTI-BAN + PAUSAS HUMANAS + DOBLE MOTOR HF)
+# ⚽ BOX TO BOX FC - PIPELINE v17.0 (POLLINATIONS FLUX BYPASS INFINITO + PEXELS)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v16.2"
+name: "Box to Box FC - Pipeline v17.0"
 
 concurrency:
   group: render-b2b-unico
@@ -49,7 +49,7 @@ jobs:
           mkdir -p ~/.fonts
           wget -q --timeout=30 -O ~/.fonts/BebasNeue.ttf "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf ~/.fonts/BebasNeue.ttf 2>/dev/null; echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
           fc-cache -f 2>/dev/null
-          python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
+          python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
           STYLE_INDEX=$((RANDOM % 3))
@@ -111,14 +111,11 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual Tridente"
+      - name: "🎙️🎨 Generador Visual Infinito (Pollinations FLUX Bypass -> Pexels)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          HUGGINGFACE_API_KEY_1: ${{ secrets.HUGGINGFACE_API_KEY_1 }}
-          HUGGINGFACE_API_KEY_2: ${{ secrets.HUGGINGFACE_API_KEY_2 }}
-          HUGGINGFACE_API_KEY_3: ${{ secrets.HUGGINGFACE_API_KEY_3 }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           AUDIO_OK=false
@@ -135,7 +132,7 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, requests, random, time, shutil
+          import os, sys, json, requests, random, time, urllib.parse
           from PIL import Image
           sys.stdout.reconfigure(encoding='utf-8')
 
@@ -149,8 +146,6 @@ jobs:
           if not isinstance(prompts, list) or len(prompts) == 0:
               prompts = []
 
-          hf_keys = [k for k in [os.environ.get('HUGGINGFACE_API_KEY_1'), os.environ.get('HUGGINGFACE_API_KEY_2'), os.environ.get('HUGGINGFACE_API_KEY_3')] if k and k.strip()]
-          
           ia_images = []
 
           def purificar_imagen(ruta):
@@ -158,95 +153,52 @@ jobs:
                   img = Image.open(ruta).convert('RGB')
                   img.save(ruta, 'JPEG', quality=95)
                   return True
-              except:
+              except Exception as e:
+                  print(f"   ⚠️ Error de formato en {ruta}: {e}")
                   return False
 
-          def fallback_hf_api(prompt_text, index):
-              if not hf_keys:
-                  print("   ⚠️ No hay claves de Hugging Face. Saltando Fase 2.")
-                  return None
-                  
-              hf_key = random.choice(hf_keys)
-              headers = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
-              data = {"inputs": prompt_text}
+          def generar_imagen_pollinations_flux(prompt_text, index):
+              print(f"   ▶️ [MOTOR INMORTAL] Forzando FLUX en Pollinations para escena {index+1}...")
+              
+              # Codificamos el texto para que la URL no se rompa y forzamos ancho, alto y el modelo FLUX
+              prompt_codificado = urllib.parse.quote(prompt_text.strip())
+              seed = random.randint(1, 999999)
+              
+              # LA MAGIA: &model=flux activa el fotorrealismo brutal en vez de la basura por defecto
+              url = f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&model=flux&nologo=true&seed={seed}"
+              
               dest_path = f"ia_img_{index}.jpg"
 
-              # Lista de modelos (Si FLUX es de pago/bloqueado, saltará a SDXL que es siempre gratis)
-              modelos_hf = [
-                  "black-forest-labs/FLUX.1-schnell",
-                  "stabilityai/stable-diffusion-xl-base-1.0"
-              ]
-
-              for modelo in modelos_hf:
-                  print(f"   ▶️ [FASE 2] Probando API oficial con modelo: {modelo}")
-                  url = f"https://api-inference.huggingface.co/models/{modelo}"
-                  
-                  for intento in range(2):
-                      try:
-                          res = requests.post(url, headers=headers, json=data, timeout=60)
-                          if res.status_code == 200:
-                              with open(dest_path, 'wb') as f:
-                                  f.write(res.content)
-                              if purificar_imagen(dest_path):
-                                  print(f"   ✅ Éxito con Hugging Face API ({modelo}).")
-                                  return dest_path
-                          else:
-                              error_msg = res.text[:80].replace('\n', ' ')
-                              print(f"   ⚠️ Error HF ({res.status_code}): {error_msg}")
-                              if res.status_code == 429: # Límite de la clave
-                                  hf_key = random.choice(hf_keys)
-                                  headers["Authorization"] = f"Bearer {hf_key}"
-                      except Exception as e:
-                          print(f"   ⚠️ Fallo de conexión HF: {e}")
-                      time.sleep(5)
+              for intento in range(3):
+                  try:
+                      res = requests.get(url, timeout=60)
+                      if res.status_code == 200:
+                          with open(dest_path, 'wb') as f:
+                              f.write(res.content)
+                          if purificar_imagen(dest_path):
+                              print(f"   ✅ Éxito absoluto (Pollinations FLUX Bypass).")
+                              return dest_path
+                      else:
+                          print(f"   ⚠️ Error de servidor (Intento {intento+1}/3).")
+                  except Exception as e:
+                      print(f"   ⚠️ Fallo de conexión: {e}")
+                  time.sleep(5) # Pequeña pausa anti-caídas
+              
               return None
 
-          def generar_imagen_hibrida(prompt_text, index):
-              print(f"   ▶️ [FASE 1: MOTOR INVISIBLE] Hackeando Gradio (FLUX) para escena {index+1}...")
-              
-              for intento in range(3): # Aumentamos intentos por si hay cola
-                  try:
-                      from gradio_client import Client
-                      client = Client("black-forest-labs/FLUX.1-schnell")
-                      
-                      result = client.predict(
-                          prompt=prompt_text,
-                          seed=random.randint(1, 999999),
-                          randomize_seed=False,
-                          width=768,
-                          height=1344,
-                          num_inference_steps=4,
-                          api_name="/infer"
-                      )
-                      
-                      img_path = result[0] if isinstance(result, (tuple, list)) else result
-                      dest_path = f"ia_img_{index}.jpg"
-                      
-                      shutil.copy(img_path, dest_path)
-                      
-                      if purificar_imagen(dest_path):
-                          print(f"   ✅ Éxito absoluto con Motor Invisible.")
-                          return dest_path
-                  except Exception as e:
-                      print(f"   ⚠️ Servidor saturado/Cola (Intento {intento+1}/3). Esperando 15s...")
-                      time.sleep(15)
-              
-              print("   ❌ Motor Invisible bloqueado. Pasando al Escudo 2 (API Oficial)...")
-              return fallback_hf_api(prompt_text, index)
-
           if prompts:
-              print(f"🛡️ Arrancando Tridente Anti-Ban...")
+              print(f"🛡️ Arrancando Motor Inmortal (Infinito, Sin API Keys)...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
-                  resultado = generar_imagen_hibrida(p, i)
+                  resultado = generar_imagen_pollinations_flux(p, i)
                   if resultado:
                       ia_images.append(resultado)
                   else:
                       print(f" ❌ Fallo total en escena {i+1}.")
                   
                   if i < len(prompts) - 1:
-                      print("   ⏱️ PAUSA HUMANA DE 15s (Evitando Ban de IP)...")
-                      time.sleep(15)
+                      # Al no usar Hugging Face, no nos banean, pero dejamos 3 segundos por cortesía
+                      time.sleep(3)
 
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
@@ -266,7 +218,7 @@ jobs:
                   print("✅ Fondo Infográfico ensamblado con éxito!")
                   sys.exit(0)
 
-          print("\n⚠️ [FASE 3] Activando Rescate Pexels (Las IAs fallaron)...")
+          print("\n⚠️ [FASE DE RESCATE] Activando Pexels (Fallo catastrófico de la IA)...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
           query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium'
           downloaded = []
