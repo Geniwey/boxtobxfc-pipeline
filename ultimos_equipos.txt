@@ -1,4 +1,3 @@
-AC Milan
 Atltico Madrid
 Just Fontaine
 Inter de Milan
@@ -8,3 +7,4 @@ Leicester City
 Brasil
 Inglaterra
 Chelsea
+Barcelona
