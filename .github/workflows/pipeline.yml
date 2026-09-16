@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v21.0 (MULTI-SPACE FLUX HACKER + ANTI-ALIENTEXT)
+# ⚽ BOX TO BOX FC - PIPELINE v22.0 (GHOST SOCKS5 IP ROTATOR + FLUX INFINITO)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v21.0"
+name: "Box to Box FC - Pipeline v22.0"
 
 concurrency:
   group: render-b2b-unico
@@ -49,7 +49,8 @@ jobs:
           mkdir -p ~/.fonts
           wget -q --timeout=30 -O ~/.fonts/BebasNeue.ttf "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf ~/.fonts/BebasNeue.ttf 2>/dev/null; echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
           fc-cache -f 2>/dev/null
-          python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
+          # Instalamos SOCKS y PYSOCKS para hackear las IPs
+          python3 -m pip install --quiet pysocks "requests[socks]" openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet pysocks "requests[socks]" openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
           STYLE_INDEX=$((RANDOM % 3))
@@ -111,7 +112,7 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual Multi-Space (FLUX Infinito + Anti-Aliens)"
+      - name: "🎙️🎨 Generador Visual (PRO GHOST IP ROTATOR)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
@@ -156,80 +157,68 @@ jobs:
               except Exception:
                   return False
 
-          def gen_pollinations(prompt_text, index):
-              print(f"   ▶️ [RESCATE] Recurriendo a Pollinations...")
-              prompt_codificado = urllib.parse.quote(prompt_text.strip())
-              seed = random.randint(100000, 999999)
-              url = f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&nologo=true&seed={seed}"
+          print("   🌐 INICIANDO PROTOCOLO FANTASMA: Extrayendo red de Proxies SOCKS5 mundiales...")
+          try:
+              r = requests.get("https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt", timeout=10)
+              proxy_list = [p.strip() for p in r.text.split('\n') if p.strip()]
+              print(f"   ✅ Arsenal cargado: {len(proxy_list)} IPs disponibles para evadir el baneo.")
+          except:
+              proxy_list = []
+              print("   ⚠️ Aviso: No se pudo conectar a la red Proxy.")
+
+          def generar_ghost_ip(prompt_text, index):
+              # Forzamos estilo puro sin letras
+              prompt_codificado = urllib.parse.quote(prompt_text.strip() + ", abstract data visualization, glowing neon HUD elements, dark cinematic background, textless, NO LETTERS, NO WORDS, clean UI/UX")
               dest_path = f"ia_img_{index}.jpg"
 
-              try:
-                  res = requests.get(url, timeout=30)
-                  if res.status_code == 200:
-                      with open(dest_path, 'wb') as f: f.write(res.content)
-                      if purificar_imagen(dest_path):
-                          print(f"   ✅ Éxito con Pollinations.")
-                          return dest_path
-              except Exception: pass
+              # Rotamos entre dos APIs puras de FLUX
+              url_1 = f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&model=flux&nologo=true&seed={random.randint(1,999999)}"
+              url_2 = f"https://api.airforce/v1/imagine2?model=flux&prompt={prompt_codificado}"
+
+              # 1. ATAQUE DIRECTO (Gastamos las 3 imágenes gratuitas de la IP del servidor de GitHub)
+              print(f"   ▶️ Intentando conexión directa (Escena {index+1})...")
+              for u in [url_1, url_2]:
+                  try:
+                      res = requests.get(u, timeout=12)
+                      if res.status_code == 200 and len(res.content) > 15000:
+                          with open(dest_path, 'wb') as f: f.write(res.content)
+                          if purificar_imagen(dest_path):
+                              print("   ✅ Éxito (Conexión Directa).")
+                              return dest_path
+                  except: pass
+
+              # 2. ROTACIÓN DE IP (El sistema de 3 imágenes nos ha baneado. ¡Sacad las máscaras!)
+              print(f"   ⚠️ Límite de 3 imágenes detectado (IP Baneada). Iniciando Rotación de IP SOCKS5...")
+              if not proxy_list: return None
+
+              for intento in range(25): # Probamos hasta 25 IPs distintas a la velocidad de la luz
+                  ip = random.choice(proxy_list)
+                  proxies = {"http": f"socks5h://{ip}", "https": f"socks5h://{ip}"}
+                  
+                  u = url_1 if intento % 2 == 0 else url_2
+                  print(f"   🕵️ [GHOST] Enmascarando conexión tras IP: {ip} (Intento {intento+1})")
+                  
+                  try:
+                      res = requests.get(u, proxies=proxies, timeout=10)
+                      if res.status_code == 200 and len(res.content) > 15000:
+                          with open(dest_path, 'wb') as f: f.write(res.content)
+                          if purificar_imagen(dest_path):
+                              print(f"   ✅ ¡BINGO! Seguridad burlada. Imagen {index+1} descargada con IP fantasma.")
+                              return dest_path
+                  except:
+                      pass # Proxy lento o muerto, saltamos al siguiente en milisegundos
+
               return None
 
-          def gen_gradio_multispace(prompt_text, index):
-              from gradio_client import Client
-              dest_path = f"ia_img_{index}.jpg"
-              
-              # LA MAGIA: Cuatro servidores públicos distintos de FLUX.1
-              # Cuando uno nos banea la IP por hacer 3 fotos, saltamos al siguiente.
-              spaces = [
-                  "black-forest-labs/FLUX.1-schnell",
-                  "Shakker-Labs/FLUX.1-schnell",
-                  "mukaist/FLUX.1-schnell",
-                  "multimodalart/FLUX.1-schnell"
-              ]
-              
-              random.shuffle(spaces) # Mezclamos para no atacar siempre al mismo
-              
-              for space in spaces:
-                  print(f"   ▶️ [MOTOR FLUX] Intentando hackear servidor: {space}...")
-                  try:
-                      client = Client(space)
-                      result = client.predict(
-                          prompt=prompt_text, 
-                          seed=random.randint(1, 999999), 
-                          randomize_seed=False, 
-                          width=768, 
-                          height=1344, 
-                          num_inference_steps=4, 
-                          api_name="/infer"
-                      )
-                      img_path = result[0] if isinstance(result, (tuple, list)) else result
-                      shutil.copy(img_path, dest_path)
-                      
-                      if purificar_imagen(dest_path):
-                          print(f"   ✅ Éxito espectacular en {space}.")
-                          return dest_path
-                  except Exception as e:
-                      print(f"   ⚠️ Servidor {space} saturado o IP Baneada. Probando el siguiente...")
-              
-              # Si han caído los 4 servidores (muy raro), salta a Pollinations
-              return gen_pollinations(prompt_text, index)
-
-
           if prompts:
-              print(f"🛡️ Desplegando Motor Multi-Space FLUX + Filtro Anti-Letras Alienígenas...")
+              print(f"🛡️ Desplegando Motor IP-Rotator (Infinito, Evadiendo Baneos)...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
-                  
-                  # INYECCIÓN OBLIGATORIA: Destruimos cualquier intento de generar letras y forzamos el estilo "Data HUD"
-                  p_limpio = p + ", abstract data visualization, glowing neon HUD elements, futuristic sports analytics, holographic nodes, dark cinematic background, textless, NO LETTERS, NO WORDS, NO NUMBERS, clean UI/UX"
-                  
-                  resultado = gen_gradio_multispace(p_limpio, i)
-                  
+                  resultado = generar_ghost_ip(p, i)
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Fallo total en escena {i+1}.")
-                  
-                  time.sleep(2)
+                      print(f" ❌ Fallo total en escena {i+1} tras agotar proxies.")
 
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
