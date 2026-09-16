@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v25.0 (MOTOR ETERNO FLUX - CERO APIS / CERO PAGOS)
+# ⚽ BOX TO BOX FC - PIPELINE v26.0 (SNIPER: ANTI-MARCAS, ANTI-BASURA, FLUX PURO)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v25.0"
+name: "Box to Box FC - Pipeline v26.0"
 
 concurrency:
   group: render-b2b-unico
@@ -111,7 +111,7 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual Eterno (Sin APIs, Sin Pagos)"
+      - name: "🎙️🎨 Generador Visual SNIPER (Anti-Marcas y Anti-Basura)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
@@ -148,63 +148,69 @@ jobs:
 
           ia_images = []
 
-          def purificar_imagen(ruta):
+          def purificar_y_recortar(ruta):
               try:
+                  # 1. FILTRO ANTI-BASURA: La mancha roja de Pollinations pesa unos 25KB. Un render FLUX 8K pesa más de 50KB.
+                  if os.path.getsize(ruta) < 45000:
+                      print(f"   🗑️ Imagen rechazada por bajo peso (Detectada mancha de error/basura).")
+                      return False
+                      
                   img = Image.open(ruta).convert('RGB')
-                  img.save(ruta, 'JPEG', quality=95)
+                  
+                  # 2. GUILLOTINA ANTI-MARCAS: Cortamos los 60 píxeles de abajo donde ponen su maldito logo
+                  w, h = img.size
+                  img_recortada = img.crop((0, 0, w, h - 60))
+                  
+                  # Restauramos a 1080x1920 limpios
+                  img_final = img_recortada.resize((1080, 1920), Image.Resampling.LANCZOS)
+                  img_final.save(ruta, 'JPEG', quality=95)
+                  
                   return True
               except Exception:
                   return False
 
-          def generar_imagen_infinita(prompt_text, index):
-              # Inyectamos el estilo gráfico directamente en la URL, asegurando que no haya texto alienígena
-              prompt_codificado = urllib.parse.quote(prompt_text.strip() + ", abstract data visualization, glowing neon HUD elements, dark cinematic background, textless, NO LETTERS, NO WORDS, clean UI/UX")
+          def generar_imagen_sniper(prompt_text, index):
+              prompt_limpio = prompt_text.strip() + ", abstract data visualization, glowing neon HUD elements, dark cinematic background, textless, NO LETTERS, NO WORDS, clean UI/UX"
+              prompt_codificado = urllib.parse.quote(prompt_limpio)
               dest_path = f"ia_img_{index}.jpg"
 
-              # Lista de endpoints 100% libres de llaves que escupen FLUX
+              # Endpoints libres combinados
               urls = [
-                  "https://image.pollinations.ai/prompt/{prompt}?width=768&height=1344&model=flux&nologo=true&seed={seed}",
-                  "https://api.airforce/v1/imagine2?model=flux&prompt={prompt}&size=768:1344&seed={seed}",
-                  "https://api.airforce/imagine?model=flux-realism&prompt={prompt}&size=768:1344"
+                  f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&model=flux&nologo=true&seed=",
+                  f"https://api.airforce/v1/imagine2?model=flux&prompt={prompt_codificado}&seed="
               ]
 
-              # Bucle de Titanio: Intentamos hasta 8 veces, con pausas, para asegurar el 100% de éxito
-              for intento in range(8):
-                  url_base = random.choice(urls)
-                  url = url_base.format(prompt=prompt_codificado, seed=random.randint(1,999999))
+              for intento in range(6):
+                  url = random.choice(urls) + str(random.randint(1,999999))
+                  print(f"   🎯 [SNIPER] Disparando a servidor libre (Intento {intento+1}/6)...")
                   
-                  print(f"   ▶️ [MOTOR ETERNO] Atacando servidor libre (Intento {intento+1}/8)...")
                   try:
-                      res = requests.get(url, timeout=25)
-                      # Solo aceptamos imágenes reales y pesadas, nada de mensajes de error HTML
-                      if res.status_code == 200 and len(res.content) > 15000:
+                      res = requests.get(url, timeout=35)
+                      if res.status_code == 200:
                           with open(dest_path, 'wb') as f:
                               f.write(res.content)
-                          if purificar_imagen(dest_path):
-                              print(f"   ✅ ¡Boom! Infografía {index+1} capturada con éxito.")
+                          
+                          if purificar_y_recortar(dest_path):
+                              print(f"   ✅ ¡Blanco perfecto! Infografía {index+1} limpia, pesada y sin marcas de agua.")
                               return dest_path
                   except Exception as e:
                       pass
                   
-                  print("   ⏳ Servidor congestionado. Respirando 8 segundos para evitar el colapso...")
-                  time.sleep(8)
+                  # 3. PACIENCIA DE FRANCOTIRADOR: Esperamos 15s reales para no saturar al servidor y que no nos trolee
+                  print("   ⏳ Recargando... (Pausa táctica de 15s para burlar el cortafuegos)")
+                  time.sleep(15)
                   
               return None
 
           if prompts:
-              print(f"🛡️ Desplegando Motor Eterno (Cero APIs, Cero Pagos, Cero Mantenimiento)...")
+              print(f"🛡️ Desplegando Motor Sniper (Filtro Anti-Basura y Guillotina Activada)...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
-                  resultado = generar_imagen_infinita(p, i)
+                  resultado = generar_imagen_sniper(p, i)
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Fallo crítico en escena {i+1}. Bucle de titanio superado.")
-                  
-                  # Esta es la pausa mágica. Evita que la IP de GitHub sea bloqueada por spam masivo.
-                  if i < len(prompts) - 1:
-                      print("   ⏱️ Pausa táctica de 10s para limpiar la caché del servidor...")
-                      time.sleep(10)
+                      print(f" ❌ Fallo total en escena {i+1}.")
 
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
