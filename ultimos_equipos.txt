@@ -1,4 +1,3 @@
-Grecia
 Sevilla
 Leicester City
 Brasil
@@ -8,3 +7,4 @@ Barcelona
 Manchester City
 Juventus
 Hakan Sukur
+Just Fontaine
