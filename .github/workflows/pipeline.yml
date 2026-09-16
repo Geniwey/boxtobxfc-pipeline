@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v20.0 (HIDRA: IMAGEN 3 + FLUX + SDXL + POLLINATIONS + PEXELS)
+# ⚽ BOX TO BOX FC - PIPELINE v21.0 (MULTI-SPACE FLUX HACKER + ANTI-ALIENTEXT)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v20.0"
+name: "Box to Box FC - Pipeline v21.0"
 
 concurrency:
   group: render-b2b-unico
@@ -111,15 +111,10 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual Hidra de 5 Cabezas"
+      - name: "🎙️🎨 Generador Visual Multi-Space (FLUX Infinito + Anti-Aliens)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
-          GOOGLE_API_KEY_1: ${{ secrets.GOOGLE_API_KEY_1 }}
-          GOOGLE_API_KEY_2: ${{ secrets.GOOGLE_API_KEY_2 }}
-          HUGGINGFACE_API_KEY_1: ${{ secrets.HUGGINGFACE_API_KEY_1 }}
-          HUGGINGFACE_API_KEY_2: ${{ secrets.HUGGINGFACE_API_KEY_2 }}
-          HUGGINGFACE_API_KEY_3: ${{ secrets.HUGGINGFACE_API_KEY_3 }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
@@ -158,15 +153,14 @@ jobs:
                   img = Image.open(ruta).convert('RGB')
                   img.save(ruta, 'JPEG', quality=95)
                   return True
-              except Exception as e:
+              except Exception:
                   return False
 
-          # CABEZA 4: Pollinations Infinito (Sin Marca de Agua, Dark UI)
           def gen_pollinations(prompt_text, index):
-              print(f"   ▶️ [CABEZA 4] Recurriendo a Pollinations Infinito...")
-              prompt_codificado = urllib.parse.quote(prompt_text.strip() + ", dark aesthetic, hyperrealistic")
+              print(f"   ▶️ [RESCATE] Recurriendo a Pollinations...")
+              prompt_codificado = urllib.parse.quote(prompt_text.strip())
               seed = random.randint(100000, 999999)
-              url = f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&nologo=true&seed={seed}&enhance=false"
+              url = f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&nologo=true&seed={seed}"
               dest_path = f"ia_img_{index}.jpg"
 
               try:
@@ -179,103 +173,63 @@ jobs:
               except Exception: pass
               return None
 
-          # CABEZA 3: Hugging Face API Oficial (Stable Diffusion XL)
-          def gen_hf(prompt_text, index):
-              hf_keys = [k for k in [os.environ.get('HUGGINGFACE_API_KEY_1'), os.environ.get('HUGGINGFACE_API_KEY_2'), os.environ.get('HUGGINGFACE_API_KEY_3')] if k and k.strip()]
-              if not hf_keys:
-                  print("   ⚠️ No hay claves de Hugging Face en GitHub.")
-                  return gen_pollinations(prompt_text, index)
-                  
-              hf_key = random.choice(hf_keys)
-              print(f"   ▶️ [CABEZA 3] Hugging Face SDXL (Clave terminada en {hf_key[-4:]})...")
-              
-              headers = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
-              data = {"inputs": prompt_text}
+          def gen_gradio_multispace(prompt_text, index):
+              from gradio_client import Client
               dest_path = f"ia_img_{index}.jpg"
-              url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-
-              try:
-                  res = requests.post(url, headers=headers, json=data, timeout=40)
-                  if res.status_code == 200:
-                      with open(dest_path, 'wb') as f: f.write(res.content)
-                      if purificar_imagen(dest_path):
-                          print(f"   ✅ Éxito con Hugging Face SDXL.")
-                          return dest_path
-                  elif res.status_code == 429:
-                      print("   ⚠️ Límite de la clave HF alcanzado.")
-              except Exception: pass
               
+              # LA MAGIA: Cuatro servidores públicos distintos de FLUX.1
+              # Cuando uno nos banea la IP por hacer 3 fotos, saltamos al siguiente.
+              spaces = [
+                  "black-forest-labs/FLUX.1-schnell",
+                  "Shakker-Labs/FLUX.1-schnell",
+                  "mukaist/FLUX.1-schnell",
+                  "multimodalart/FLUX.1-schnell"
+              ]
+              
+              random.shuffle(spaces) # Mezclamos para no atacar siempre al mismo
+              
+              for space in spaces:
+                  print(f"   ▶️ [MOTOR FLUX] Intentando hackear servidor: {space}...")
+                  try:
+                      client = Client(space)
+                      result = client.predict(
+                          prompt=prompt_text, 
+                          seed=random.randint(1, 999999), 
+                          randomize_seed=False, 
+                          width=768, 
+                          height=1344, 
+                          num_inference_steps=4, 
+                          api_name="/infer"
+                      )
+                      img_path = result[0] if isinstance(result, (tuple, list)) else result
+                      shutil.copy(img_path, dest_path)
+                      
+                      if purificar_imagen(dest_path):
+                          print(f"   ✅ Éxito espectacular en {space}.")
+                          return dest_path
+                  except Exception as e:
+                      print(f"   ⚠️ Servidor {space} saturado o IP Baneada. Probando el siguiente...")
+              
+              # Si han caído los 4 servidores (muy raro), salta a Pollinations
               return gen_pollinations(prompt_text, index)
 
-          # CABEZA 2: Gradio Hacker (FLUX.1 Gratis)
-          def gen_gradio(prompt_text, index):
-              print(f"   ▶️ [CABEZA 2] Motor Hacker Gradio (FLUX.1 Público)...")
-              try:
-                  from gradio_client import Client
-                  client = Client("black-forest-labs/FLUX.1-schnell")
-                  result = client.predict(prompt=prompt_text, seed=random.randint(1, 999999), randomize_seed=False, width=768, height=1344, num_inference_steps=4, api_name="/infer")
-                  img_path = result[0] if isinstance(result, (tuple, list)) else result
-                  dest_path = f"ia_img_{index}.jpg"
-                  shutil.copy(img_path, dest_path)
-                  if purificar_imagen(dest_path):
-                      print(f"   ✅ Éxito con Motor Hacker Gradio.")
-                      return dest_path
-              except Exception as e:
-                  print(f"   ⚠️ Servidor público de Gradio colapsado o IP Baneada.")
-              
-              return gen_hf(prompt_text, index)
-
-          # CABEZA 1: Google Imagen 3 Oficial
-          def gen_google(prompt_text, index):
-              keys = [k for k in [os.environ.get('GOOGLE_API_KEY_1'), os.environ.get('GOOGLE_API_KEY_2')] if k and k.strip()]
-              if not keys:
-                  print("   ⚠️ No hay claves de Google en GitHub.")
-                  return gen_gradio(prompt_text, index)
-
-              key = random.choice(keys)
-              print(f"   ▶️ [CABEZA 1] Google Imagen 3 (Clave terminada en {key[-4:]})...")
-              
-              # API Oficial de Gemini para generación de imágenes (Beta)
-              url = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-images:predict"
-              dest_path = f"ia_img_{index}.jpg"
-              
-              payload = {
-                  "instances": [{"prompt": prompt_text}],
-                  "parameters": {"sampleCount": 1, "aspectRatio": "9:16"}
-              }
-              
-              try:
-                  res = requests.post(f"{url}?key={key}", json=payload, headers={"Content-Type": "application/json"}, timeout=40)
-                  if res.status_code == 200:
-                      b64 = res.json().get('predictions', [{}])[0].get('bytesBase64Encoded')
-                      if b64:
-                          with open(dest_path, 'wb') as f: f.write(base64.b64decode(b64))
-                          if purificar_imagen(dest_path):
-                              print("   ✅ Éxito con Google Imagen 3.")
-                              return dest_path
-                  elif res.status_code == 400 and ("safety" in res.text.lower() or "blocked" in res.text.lower()):
-                      print("   ⚠️ Filtro Google (Safety). Mandando a la Cabeza 2 (Gradio no tiene filtros)...")
-                      return gen_gradio(prompt_text, index)
-                  else:
-                      print(f"   ⚠️ Google devolvió error {res.status_code}.")
-              except Exception as e:
-                  print(f"   ⚠️ Fallo red Google.")
-              
-              return gen_gradio(prompt_text, index)
 
           if prompts:
-              print(f"🛡️ Desplegando Hidra Generativa (Google -> Gradio -> HF -> Pollinations)...")
+              print(f"🛡️ Desplegando Motor Multi-Space FLUX + Filtro Anti-Letras Alienígenas...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
-                  resultado = gen_google(p, i)
+                  
+                  # INYECCIÓN OBLIGATORIA: Destruimos cualquier intento de generar letras y forzamos el estilo "Data HUD"
+                  p_limpio = p + ", abstract data visualization, glowing neon HUD elements, futuristic sports analytics, holographic nodes, dark cinematic background, textless, NO LETTERS, NO WORDS, NO NUMBERS, clean UI/UX"
+                  
+                  resultado = gen_gradio_multispace(p_limpio, i)
+                  
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Las 4 Cabezas de IA han fallado en la escena {i+1}.")
+                      print(f" ❌ Fallo total en escena {i+1}.")
                   
-                  # Pausa para no saturar las APIs gratuitas
-                  if i < len(prompts) - 1:
-                      time.sleep(3)
+                  time.sleep(2)
 
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
@@ -295,7 +249,7 @@ jobs:
                   print("✅ Fondo Infográfico ensamblado con éxito!")
                   sys.exit(0)
 
-          print("\n⚠️ [CABEZA 5: PARACAÍDAS FINAL] Activando Pexels (Todo falló)...")
+          print("\n⚠️ [PARACAÍDAS FINAL] Activando Pexels...")
           api_key = os.environ.get('PEXELS_API_KEY', '').strip()
           query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium'
           downloaded = []
