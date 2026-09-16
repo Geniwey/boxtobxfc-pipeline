@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v22.0 (GHOST SOCKS5 IP ROTATOR + FLUX INFINITO)
+# ⚽ BOX TO BOX FC - PIPELINE v23.0 (MULTI-SPACE FLUX ROTATOR - NO PROXIES)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v22.0"
+name: "Box to Box FC - Pipeline v23.0"
 
 concurrency:
   group: render-b2b-unico
@@ -49,8 +49,7 @@ jobs:
           mkdir -p ~/.fonts
           wget -q --timeout=30 -O ~/.fonts/BebasNeue.ttf "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf ~/.fonts/BebasNeue.ttf 2>/dev/null; echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
           fc-cache -f 2>/dev/null
-          # Instalamos SOCKS y PYSOCKS para hackear las IPs
-          python3 -m pip install --quiet pysocks "requests[socks]" openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet pysocks "requests[socks]" openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
+          python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet gradio_client openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
           STYLE_INDEX=$((RANDOM % 3))
@@ -112,7 +111,7 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual (PRO GHOST IP ROTATOR)"
+      - name: "🎙️🎨 Generador Visual (PRO FLUX ROTATOR)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
@@ -133,7 +132,7 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, requests, random, time, base64, shutil, urllib.parse
+          import os, sys, json, random, time, shutil, urllib.parse, requests
           from PIL import Image
           sys.stdout.reconfigure(encoding='utf-8')
 
@@ -157,68 +156,92 @@ jobs:
               except Exception:
                   return False
 
-          print("   🌐 INICIANDO PROTOCOLO FANTASMA: Extrayendo red de Proxies SOCKS5 mundiales...")
-          try:
-              r = requests.get("https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt", timeout=10)
-              proxy_list = [p.strip() for p in r.text.split('\n') if p.strip()]
-              print(f"   ✅ Arsenal cargado: {len(proxy_list)} IPs disponibles para evadir el baneo.")
-          except:
-              proxy_list = []
-              print("   ⚠️ Aviso: No se pudo conectar a la red Proxy.")
-
-          def generar_ghost_ip(prompt_text, index):
-              # Forzamos estilo puro sin letras
+          def fallback_pollinations(prompt_text, index):
+              print(f"   ▶️ Activando sistema de emergencia (Pollinations) para escena {index+1}...")
               prompt_codificado = urllib.parse.quote(prompt_text.strip() + ", abstract data visualization, glowing neon HUD elements, dark cinematic background, textless, NO LETTERS, NO WORDS, clean UI/UX")
               dest_path = f"ia_img_{index}.jpg"
-
-              # Rotamos entre dos APIs puras de FLUX
               url_1 = f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&model=flux&nologo=true&seed={random.randint(1,999999)}"
               url_2 = f"https://api.airforce/v1/imagine2?model=flux&prompt={prompt_codificado}"
-
-              # 1. ATAQUE DIRECTO (Gastamos las 3 imágenes gratuitas de la IP del servidor de GitHub)
-              print(f"   ▶️ Intentando conexión directa (Escena {index+1})...")
+              
               for u in [url_1, url_2]:
                   try:
-                      res = requests.get(u, timeout=12)
+                      res = requests.get(u, timeout=15)
                       if res.status_code == 200 and len(res.content) > 15000:
                           with open(dest_path, 'wb') as f: f.write(res.content)
                           if purificar_imagen(dest_path):
-                              print("   ✅ Éxito (Conexión Directa).")
+                              print(f"   ✅ Éxito con red de emergencia.")
                               return dest_path
                   except: pass
-
-              # 2. ROTACIÓN DE IP (El sistema de 3 imágenes nos ha baneado. ¡Sacad las máscaras!)
-              print(f"   ⚠️ Límite de 3 imágenes detectado (IP Baneada). Iniciando Rotación de IP SOCKS5...")
-              if not proxy_list: return None
-
-              for intento in range(25): # Probamos hasta 25 IPs distintas a la velocidad de la luz
-                  ip = random.choice(proxy_list)
-                  proxies = {"http": f"socks5h://{ip}", "https": f"socks5h://{ip}"}
-                  
-                  u = url_1 if intento % 2 == 0 else url_2
-                  print(f"   🕵️ [GHOST] Enmascarando conexión tras IP: {ip} (Intento {intento+1})")
-                  
-                  try:
-                      res = requests.get(u, proxies=proxies, timeout=10)
-                      if res.status_code == 200 and len(res.content) > 15000:
-                          with open(dest_path, 'wb') as f: f.write(res.content)
-                          if purificar_imagen(dest_path):
-                              print(f"   ✅ ¡BINGO! Seguridad burlada. Imagen {index+1} descargada con IP fantasma.")
-                              return dest_path
-                  except:
-                      pass # Proxy lento o muerto, saltamos al siguiente en milisegundos
-
               return None
 
+          def generar_flux_rotator(prompt_text, index):
+              from gradio_client import Client
+              dest_path = f"ia_img_{index}.jpg"
+              
+              # Arsenal de 12 espacios públicos. Si uno banea la IP, pasamos al siguiente de forma invisible.
+              spaces = [
+                  "black-forest-labs/FLUX.1-schnell",
+                  "Shakker-Labs/FLUX.1-schnell",
+                  "mukaist/FLUX.1-schnell",
+                  "multimodalart/FLUX.1-schnell",
+                  "gokaygokay/FLUX.1-schnell",
+                  "jbilcke-hf/flux-schnell",
+                  "ehristoforu/FLUX.1-schnell",
+                  "ByteDance/SDXL-Lightning", # Paracaídas SDXL altísimo rendimiento
+                  "AlekseyCalvin/FLUX.1-schnell-Multi",
+                  "John6666/flux1-schnell-fp8-gguf",
+                  "mark2s/FLUX.1-schnell",
+                  "strangerzonehf/Flux-Midjourney-Mix2-LoRA"
+              ]
+              
+              # Barajamos los espacios para no saturar siempre los mismos
+              random.shuffle(spaces)
+              
+              prompt_hud = prompt_text.strip() + ", abstract data visualization, glowing neon HUD elements, holographic nodes, dark cinematic background, textless, NO LETTERS, NO WORDS, NO NUMBERS, clean UI/UX"
+              
+              for space in spaces:
+                  print(f"   ▶️ [MOTOR] Intentando conexión con el nodo: {space}...")
+                  try:
+                      client = Client(space, verbose=False)
+                      
+                      # Algunos espacios de SDXL usan parámetros distintos, los capturamos con un try genérico
+                      try:
+                          result = client.predict(
+                              prompt=prompt_hud, 
+                              seed=random.randint(1, 999999), 
+                              randomize_seed=False, 
+                              width=768, 
+                              height=1344, 
+                              num_inference_steps=4, 
+                              api_name="/infer"
+                          )
+                      except:
+                          # Si falla por parámetros (ej: SDXL), le pasamos el prompt pelado
+                          result = client.predict(prompt_hud, api_name="/infer")
+
+                      img_path = result[0] if isinstance(result, (tuple, list)) else result
+                      shutil.copy(img_path, dest_path)
+                      
+                      if purificar_imagen(dest_path):
+                          print(f"   ✅ Éxito absoluto. Imagen extraída del nodo {space}.")
+                          return dest_path
+                  except Exception as e:
+                      print(f"   ⚠️ Nodo {space} bloqueado/saturado. Cambiando de objetivo...")
+                      time.sleep(1) # Pausa rápida antes de probar otro servidor
+
+              # Si los 12 servidores han bloqueado la IP (Extremadamente raro), usamos el sistema secundario web
+              return fallback_pollinations(prompt_hud, index)
+
           if prompts:
-              print(f"🛡️ Desplegando Motor IP-Rotator (Infinito, Evadiendo Baneos)...")
+              print(f"🛡️ Desplegando Enjambre FLUX.1 (12 Nodos Públicos)...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
-                  resultado = generar_ghost_ip(p, i)
+                  resultado = generar_flux_rotator(p, i)
                   if resultado:
                       ia_images.append(resultado)
                   else:
-                      print(f" ❌ Fallo total en escena {i+1} tras agotar proxies.")
+                      print(f" ❌ Fallo crítico en escena {i+1}.")
+                  time.sleep(2) # Pausa de cortesía entre imágenes
 
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
