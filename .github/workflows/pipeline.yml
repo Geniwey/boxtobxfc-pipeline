@@ -1,8 +1,8 @@
-# ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v26.0 (SNIPER: ANTI-MARCAS, ANTI-BASURA, FLUX PURO)
+ç# ==============================================================================
+# ⚽ BOX TO BOX FC - PIPELINE v29.0 (TANQUE: GOOGLE IMAGEN 3 + HUGGING FACE)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v26.0"
+name: "Box to Box FC - Pipeline v29.0"
 
 concurrency:
   group: render-b2b-unico
@@ -111,11 +111,14 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual SNIPER (Anti-Marcas y Anti-Basura)"
+      - name: "🎙️🎨 Generador Visual Híbrido (Google Imagen 3 + Hugging Face)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          GOOGLE_API_KEY_1: ${{ secrets.GOOGLE_API_KEY_1 }}
+          GOOGLE_API_KEY_2: ${{ secrets.GOOGLE_API_KEY_2 }}
+          HUGGINGFACE_API_KEY_1: ${{ secrets.HUGGINGFACE_API_KEY_1 }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           AUDIO_OK=false
@@ -132,7 +135,7 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, random, time, requests, urllib.parse
+          import os, sys, json, time, requests, random, base64
           from PIL import Image
           sys.stdout.reconfigure(encoding='utf-8')
 
@@ -148,69 +151,95 @@ jobs:
 
           ia_images = []
 
-          def purificar_y_recortar(ruta):
+          def purificar_imagen(ruta):
               try:
-                  # 1. FILTRO ANTI-BASURA: La mancha roja de Pollinations pesa unos 25KB. Un render FLUX 8K pesa más de 50KB.
-                  if os.path.getsize(ruta) < 45000:
-                      print(f"   🗑️ Imagen rechazada por bajo peso (Detectada mancha de error/basura).")
-                      return False
-                      
+                  if os.path.getsize(ruta) < 40000: return False # Evitar manchas de error
                   img = Image.open(ruta).convert('RGB')
-                  
-                  # 2. GUILLOTINA ANTI-MARCAS: Cortamos los 60 píxeles de abajo donde ponen su maldito logo
-                  w, h = img.size
-                  img_recortada = img.crop((0, 0, w, h - 60))
-                  
-                  # Restauramos a 1080x1920 limpios
-                  img_final = img_recortada.resize((1080, 1920), Image.Resampling.LANCZOS)
-                  img_final.save(ruta, 'JPEG', quality=95)
-                  
+                  img = img.resize((1080, 1920), Image.Resampling.LANCZOS)
+                  img.save(ruta, 'JPEG', quality=95)
                   return True
-              except Exception:
-                  return False
+              except Exception: return False
 
-          def generar_imagen_sniper(prompt_text, index):
-              prompt_limpio = prompt_text.strip() + ", abstract data visualization, glowing neon HUD elements, dark cinematic background, textless, NO LETTERS, NO WORDS, clean UI/UX"
-              prompt_codificado = urllib.parse.quote(prompt_limpio)
-              dest_path = f"ia_img_{index}.jpg"
-
-              # Endpoints libres combinados
-              urls = [
-                  f"https://image.pollinations.ai/prompt/{prompt_codificado}?width=768&height=1344&model=flux&nologo=true&seed=",
-                  f"https://api.airforce/v1/imagine2?model=flux&prompt={prompt_codificado}&seed="
+          def intentar_huggingface(prompt_limpio, dest_path):
+              hf_key = os.environ.get('HUGGINGFACE_API_KEY_1', '').strip()
+              if not hf_key: return False
+              
+              print("   ▶️ [ESCUDO 2] Atacando Hugging Face (Llave Única)...")
+              headers = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
+              data = {"inputs": prompt_limpio}
+              
+              modelos = [
+                  "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
+                  "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
               ]
 
-              for intento in range(6):
-                  url = random.choice(urls) + str(random.randint(1,999999))
-                  print(f"   🎯 [SNIPER] Disparando a servidor libre (Intento {intento+1}/6)...")
+              for modelo_url in modelos:
+                  for intento in range(2):
+                      try:
+                          res = requests.post(modelo_url, headers=headers, json=data, timeout=60)
+                          if res.status_code == 200:
+                              with open(dest_path, 'wb') as f: f.write(res.content)
+                              if purificar_imagen(dest_path):
+                                  print(f"   ✅ ¡Éxito con Hugging Face!")
+                                  return True
+                          elif res.status_code == 429:
+                              print("   ⚠️ Llave HF saturada. Respirando 20 segundos...")
+                              time.sleep(20)
+                      except Exception:
+                          time.sleep(5)
+              return False
+
+          def generar_hibrido(prompt_text, index):
+              prompt_limpio = prompt_text.strip() + ", abstract data visualization, glowing neon HUD elements, dark cinematic background, textless, NO LETTERS, NO WORDS, clean UI/UX"
+              dest_path = f"ia_img_{index}.jpg"
+
+              # 1. INTENTAR CON GOOGLE IMAGEN 3 (Ilimitado y Oficial)
+              g_keys = [k for k in [os.environ.get('GOOGLE_API_KEY_1'), os.environ.get('GOOGLE_API_KEY_2')] if k and k.strip()]
+              
+              if g_keys:
+                  key = random.choice(g_keys)
+                  print(f"   ▶️ [ESCUDO 1] Atacando Google Imagen 3 (Clave ...{key[-4:]})...")
+                  url = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-images:predict"
+                  payload = {
+                      "instances": [{"prompt": prompt_limpio}],
+                      "parameters": {"sampleCount": 1, "aspectRatio": "9:16"}
+                  }
                   
                   try:
-                      res = requests.get(url, timeout=35)
+                      res = requests.post(f"{url}?key={key}", json=payload, headers={"Content-Type": "application/json"}, timeout=40)
                       if res.status_code == 200:
-                          with open(dest_path, 'wb') as f:
-                              f.write(res.content)
-                          
-                          if purificar_y_recortar(dest_path):
-                              print(f"   ✅ ¡Blanco perfecto! Infografía {index+1} limpia, pesada y sin marcas de agua.")
-                              return dest_path
+                          b64 = res.json().get('predictions', [{}])[0].get('bytesBase64Encoded')
+                          if b64:
+                              with open(dest_path, 'wb') as f:
+                                  f.write(base64.b64decode(b64))
+                              if purificar_imagen(dest_path):
+                                  print("   ✅ ¡Éxito espectacular con Google Imagen 3!")
+                                  return dest_path
+                      else:
+                          print(f"   ⚠️ Google respondió con error {res.status_code}. Pasando al Escudo 2...")
                   except Exception as e:
-                      pass
-                  
-                  # 3. PACIENCIA DE FRANCOTIRADOR: Esperamos 15s reales para no saturar al servidor y que no nos trolee
-                  print("   ⏳ Recargando... (Pausa táctica de 15s para burlar el cortafuegos)")
-                  time.sleep(15)
+                      print("   ⚠️ Fallo de red con Google. Pasando al Escudo 2...")
+
+              # 2. SI GOOGLE FALLA (O no hay llaves), ENTRA HUGGING FACE
+              if intentar_huggingface(prompt_limpio, dest_path):
+                  return dest_path
                   
               return None
 
           if prompts:
-              print(f"🛡️ Desplegando Motor Sniper (Filtro Anti-Basura y Guillotina Activada)...")
+              print(f"🛡️ Desplegando Tanque Generativo (Google x2 + Hugging Face)...")
               for i, p in enumerate(prompts):
                   print(f"\n🎬 Generando Escena {i+1}...")
-                  resultado = generar_imagen_sniper(p, i)
+                  resultado = generar_hibrido(p, i)
+                  
                   if resultado:
                       ia_images.append(resultado)
                   else:
                       print(f" ❌ Fallo total en escena {i+1}.")
+                  
+                  # Pausa pequeña para no molestar a los servidores oficiales
+                  if i < len(prompts) - 1:
+                      time.sleep(5)
 
           if len(ia_images) >= 4:
               while len(ia_images) < len(prompts) and len(ia_images) < 6:
@@ -382,15 +411,6 @@ jobs:
           YOUTUBE_CLIENT_ID_1: ${{ secrets.YOUTUBE_CLIENT_ID_1 }}
           YOUTUBE_CLIENT_SECRET_1: ${{ secrets.YOUTUBE_CLIENT_SECRET_1 }}
           YOUTUBE_REFRESH_TOKEN_1: ${{ secrets.YOUTUBE_REFRESH_TOKEN_1 }}
-          YOUTUBE_CLIENT_ID_2: ${{ secrets.YOUTUBE_CLIENT_ID_2 }}
-          YOUTUBE_CLIENT_SECRET_2: ${{ secrets.YOUTUBE_CLIENT_SECRET_2 }}
-          YOUTUBE_REFRESH_TOKEN_2: ${{ secrets.YOUTUBE_REFRESH_TOKEN_2 }}
-          YOUTUBE_CLIENT_ID_3: ${{ secrets.YOUTUBE_CLIENT_ID_3 }}
-          YOUTUBE_CLIENT_SECRET_3: ${{ secrets.YOUTUBE_CLIENT_SECRET_3 }}
-          YOUTUBE_REFRESH_TOKEN_3: ${{ secrets.YOUTUBE_REFRESH_TOKEN_3 }}
-          YOUTUBE_CLIENT_ID_4: ${{ secrets.YOUTUBE_CLIENT_ID_4 }}
-          YOUTUBE_CLIENT_SECRET_4: ${{ secrets.YOUTUBE_CLIENT_SECRET_4 }}
-          YOUTUBE_REFRESH_TOKEN_4: ${{ secrets.YOUTUBE_REFRESH_TOKEN_4 }}
         run: |
           cat << 'PYTHON_YT' > /tmp/subir_yt.py
           import os, sys
@@ -401,8 +421,6 @@ jobs:
           from googleapiclient.http import MediaFileUpload
           from googleapiclient.errors import HttpError
           sys.stdout.reconfigure(encoding='utf-8')
-
-          orden = [(datetime.now(timezone.utc).hour % 4) + 1] + [i for i in [1, 2, 3, 4] if i != (datetime.now(timezone.utc).hour % 4) + 1]
 
           def get_creds(idx):
               c_id = os.environ.get(f'YOUTUBE_CLIENT_ID_{idx}', '').strip()
@@ -419,19 +437,15 @@ jobs:
               tags = ['mundialdefutbol','mundial2026','futbol','shorts','futbolshorts','worldcup2026','boxtoboxfc','prediccion','tactica']
               body = {'snippet': {'title': titulo, 'description': desc, 'tags': tags, 'categoryId': '17'}, 'status': {'privacyStatus': 'public'}}
 
-              for idx in orden:
-                  try:
-                      creds = get_creds(idx)
-                      if not creds: continue
-                      yt = build('youtube', 'v3', credentials=creds)
-                      req = yt.videos().insert(part='snippet,status', body=body, media_body=MediaFileUpload('output.mp4', mimetype='video/mp4', resumable=True))
-                      resp = None
-                      while resp is None: _, resp = req.next_chunk()
-                      open('video_id.txt','w').write(resp['id'])
-                      print(f"✅ PUBLICADO: https://youtube.com/shorts/{resp['id']}")
-                      sys.exit(0)
-                  except HttpError as e:
-                      if 'uploadLimitExceeded' in e.content.decode(): sys.exit(2)
+              creds = get_creds(1)
+              if creds:
+                  yt = build('youtube', 'v3', credentials=creds)
+                  req = yt.videos().insert(part='snippet,status', body=body, media_body=MediaFileUpload('output.mp4', mimetype='video/mp4', resumable=True))
+                  resp = None
+                  while resp is None: _, resp = req.next_chunk()
+                  open('video_id.txt','w').write(resp['id'])
+                  print(f"✅ PUBLICADO: https://youtube.com/shorts/{resp['id']}")
+                  sys.exit(0)
               sys.exit(1)
           except: sys.exit(1)
           PYTHON_YT
