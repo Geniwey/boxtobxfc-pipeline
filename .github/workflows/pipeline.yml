@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v31.0 (MOTOR TÁCTICO VECTORIAL NATIVO + YT 4X)
+# ⚽ BOX TO BOX FC - PIPELINE v32.0 (FÉNIX: IA PURA + ESTILOS DINÁMICOS + HF ÚNICO)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v31.0"
+name: "Box to Box FC - Pipeline v32.0"
 
 concurrency:
   group: render-b2b-unico
@@ -49,7 +49,7 @@ jobs:
           mkdir -p ~/.fonts
           wget -q --timeout=30 -O ~/.fonts/BebasNeue.ttf "https://github.com/google/fonts/raw/main/ofl/bebasneuee/BebasNeue-Regular.ttf" && echo "FONT_NAME=Bebas Neue" >> $GITHUB_ENV || { cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf ~/.fonts/BebasNeue.ttf 2>/dev/null; echo "FONT_NAME=Liberation Sans" >> $GITHUB_ENV; }
           fc-cache -f 2>/dev/null
-          python3 -m pip install --quiet matplotlib scipy openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet matplotlib scipy openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
+          python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
           STYLE_INDEX=$((RANDOM % 3))
@@ -111,11 +111,14 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual Infográfico Nativo"
+      - name: "🎙️🎨 Generador Visual Fénix (IA Pura con Variabilidad)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          HUGGINGFACE_API_KEY_1: ${{ secrets.HUGGINGFACE_API_KEY_1 }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           AUDIO_OK=false
@@ -132,132 +135,161 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, random
-          import numpy as np
-          import matplotlib
-          matplotlib.use('Agg')
-          import matplotlib.pyplot as plt
-          from matplotlib.patches import Arc, Circle, Rectangle
-          from PIL import Image, ImageFilter
+          import os, sys, json, time, requests, random
+          from PIL import Image
+          sys.stdout.reconfigure(encoding='utf-8')
 
           dur_total = float(open('dur.txt').read().strip())
+          try:
+              payload = json.load(open('payload.json', 'r', encoding='utf-8'))
+              prompts = payload.get('prompts_imagenes', [])
+          except:
+              prompts = []
+              
+          if not isinstance(prompts, list) or len(prompts) == 0:
+              prompts = []
+
           ia_images = []
 
-          def draw_pitch(ax):
-              # Líneas de campo táctico profesional estilo HUD
-              pitch_color = '#0b0f19'
-              line_color = '#1f293d'
-              ax.set_facecolor(pitch_color)
+          # Buscamos tu única llave HF en cualquier formato posible
+          hf_key = (os.environ.get('HUGGINGFACE_API_KEY_1', '').strip() or 
+                    os.environ.get('HUGGINGFACE_API_KEY', '').strip() or 
+                    os.environ.get('HF_TOKEN', '').strip())
+
+          # BANCO DE ESTILOS DINÁMICOS: Esto asegura que NADA se repita visualmente
+          estilos = [
+              "cyan holographic glowing neon, dark cinematic background, ultra realistic 8k",
+              "crimson red digital HUD, futuristic sports analytics dashboard, glassmorphism",
+              "gold and deep black premium data visualization, sleek modern lines, 8k resolution",
+              "emerald green cyberpunk tactical board, glowing nodes, high tech wireframe",
+              "deep purple neon futuristic interface, advanced sports radar, ultra detailed",
+              "white and electric blue abstract digital lines, pure fotorrealism, 8k",
+              "orange amber high contrast glowing UI, dark sports analytics room"
+          ]
+
+          def purificar_imagen(ruta):
+              try:
+                  if os.path.getsize(ruta) < 40000: return False # Ignorar errores
+                  img = Image.open(ruta).convert('RGB')
+                  img = img.resize((1080, 1920), Image.Resampling.LANCZOS)
+                  img.save(ruta, 'JPEG', quality=95)
+                  return True
+              except Exception: return False
+
+          def generar_imagen_ia(prompt_base, index):
+              if not hf_key:
+                  print("   ❌ NO HAY LLAVE HF. Revisa tus Secrets de GitHub.")
+                  return None
+
+              # Elegimos un estilo al azar para esta foto y lo combinamos con tu prompt
+              estilo_elegido = random.choice(estilos)
+              prompt_final = f"{prompt_base}, {estilo_elegido}, textless, NO LETTERS, NO WORDS"
               
-              # Rectángulo exterior
-              ax.plot([0, 0, 100, 100, 0], [0, 100, 100, 0, 0], color=line_color, lw=2)
-              # Medio campo
-              ax.plot([0, 100], [50, 50], color=line_color, lw=2)
-              # Círculo central
-              centre_circle = plt.Circle((50, 50), 12, color=line_color, fill=False, lw=2)
-              ax.add_patch(centre_circle)
-              # Áreas
-              ax.add_patch(Rectangle((20, 0), 60, 18, fill=False, color=line_color, lw=2))
-              ax.add_patch(Rectangle((20, 82), 60, 18, fill=False, color=line_color, lw=2))
-
-          def render_escena(idx, tipo):
-              fig = plt.figure(figsize=(10.8, 19.2), dpi=100)
-              fig.patch.set_facecolor('#07090e')
+              dest_path = f"ia_img_{index}.jpg"
+              headers = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
+              data = {"inputs": prompt_final}
               
-              if tipo == 0: # Heatmap
-                  ax = fig.add_axes([0.1, 0.2, 0.8, 0.6])
-                  draw_pitch(ax)
-                  x = np.random.normal(loc=random.choice([25, 75]), scale=12, size=1500)
-                  y = np.random.normal(loc=random.choice([30, 70]), scale=16, size=1500)
-                  ax.hist2d(x, y, bins=40, cmap='inferno', alpha=0.75, range=[[0, 100], [0, 100]])
-                  ax.set_xlim(0, 100); ax.set_ylim(0, 100); ax.axis('off')
+              modelos = [
+                  "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
+                  "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+              ]
 
-              elif tipo == 1: # Radar Chart
-                  ax = fig.add_axes([0.15, 0.25, 0.7, 0.5], polar=True)
-                  ax.set_facecolor('#0b0f19')
-                  categories = ['Pases', 'Presión', 'Ritmo', 'Duelos', 'xG']
-                  N = len(categories)
-                  angles = [n / float(N) * 2 * np.pi for n in range(N)]
-                  angles += angles[:1]
-                  values = np.random.uniform(50, 95, size=N).tolist()
-                  values += values[:1]
-                  ax.plot(angles, values, color='#00e5ff', linewidth=3)
-                  ax.fill(angles, values, color='#00e5ff', alpha=0.35)
-                  ax.set_xticks(angles[:-1])
-                  ax.set_xticklabels(categories, color='#ffffff', size=16, weight='bold')
-                  ax.set_yticklabels([])
-                  ax.grid(color='#1f293d', linewidth=1.5)
+              for modelo_url in modelos:
+                  modelo_nombre = "FLUX.1" if "FLUX" in modelo_url else "SDXL"
+                  print(f"   ▶️ Atacando {modelo_nombre} con estilo: {estilo_elegido.split(',')[0]}...")
+                  
+                  for intento in range(3):
+                      try:
+                          res = requests.post(modelo_url, headers=headers, json=data, timeout=60)
+                          if res.status_code == 200:
+                              with open(dest_path, 'wb') as f:
+                                  f.write(res.content)
+                              if purificar_imagen(dest_path):
+                                  print(f"   ✅ ¡INFOGRAFÍA FOTORREALISTA CREADA!")
+                                  return dest_path
+                          elif res.status_code == 429:
+                              print("   ⚠️ Servidor nos pide calma. Respirando 30s...")
+                              time.sleep(30)
+                          elif res.status_code == 503:
+                              print("   ⚠️ Modelo calentando. Esperando 20s...")
+                              time.sleep(20)
+                          else:
+                              print(f"   ⚠️ Fallo HTTP {res.status_code}. Reintentando...")
+                              time.sleep(10)
+                      except Exception as e:
+                          print("   ⚠️ Fallo de red. Reintentando...")
+                          time.sleep(10)
+              return None
 
-              elif tipo == 2: # Passing Network
-                  ax = fig.add_axes([0.1, 0.2, 0.8, 0.6])
-                  draw_pitch(ax)
-                  nodes_x = np.random.uniform(20, 80, 10)
-                  nodes_y = np.random.uniform(15, 85, 10)
-                  for i in range(len(nodes_x)):
-                      for j in range(i+1, len(nodes_x)):
-                          if np.random.rand() > 0.6:
-                              ax.plot([nodes_x[i], nodes_x[j]], [nodes_y[i], nodes_y[j]], color='#00ff88', alpha=0.5, lw=np.random.uniform(1.5, 4.5))
-                  ax.scatter(nodes_x, nodes_y, s=350, color='#00ff88', edgecolors='#ffffff', lw=2, zorder=5)
-                  ax.set_xlim(0, 100); ax.set_ylim(0, 100); ax.axis('off')
+          if prompts:
+              print(f"🛡️ Desplegando IA Pura (Hugging Face + Variabilidad Visual)...")
+              for i, p in enumerate(prompts):
+                  print(f"\n🎬 Generando Escena {i+1}...")
+                  resultado = generar_imagen_ia(p, i)
+                  
+                  if resultado:
+                      ia_images.append(resultado)
+                  else:
+                      print(f" ❌ Fallo en escena {i+1}.")
+                  
+                  # PAUSA OBLIGATORIA: Para que Hugging Face no bloquee tu llave
+                  if i < len(prompts) - 1:
+                      print("   ⏱️ Pausa táctica de 20s para proteger la API...")
+                      time.sleep(20)
 
-              elif tipo == 3: # Possession / Performance Bars
-                  ax = fig.add_axes([0.15, 0.3, 0.7, 0.4])
-                  ax.set_facecolor('#0b0f19')
-                  metrics = ['Posesión', 'Duelos Ofensivos', 'Precisión Pases', 'Recuperaciones']
-                  y_pos = np.arange(len(metrics))
-                  vals = np.random.uniform(40, 90, len(metrics))
-                  ax.barh(y_pos, [100]*len(metrics), color='#151c2c', height=0.5)
-                  ax.barh(y_pos, vals, color='#ffd700', height=0.5)
-                  ax.set_yticks(y_pos)
-                  ax.set_yticklabels(metrics, color='#ffffff', size=14, weight='bold')
-                  ax.set_xlim(0, 100); ax.axis('off')
-
-              elif tipo == 4: # Shot Map
-                  ax = fig.add_axes([0.1, 0.2, 0.8, 0.6])
-                  draw_pitch(ax)
-                  shots_x = np.random.uniform(25, 75, 25)
-                  shots_y = np.random.uniform(65, 95, 25)
-                  sizes = np.random.uniform(80, 600, 25)
-                  colors = ['#ff3b30' if s > 350 else '#ffd700' for s in sizes]
-                  ax.scatter(shots_x, shots_y, s=sizes, c=colors, alpha=0.8, edgecolors='#ffffff', lw=1.5)
-                  ax.set_xlim(0, 100); ax.set_ylim(0, 100); ax.axis('off')
-
-              else: # Tactical Arrows / Formations
-                  ax = fig.add_axes([0.1, 0.2, 0.8, 0.6])
-                  draw_pitch(ax)
-                  for _ in range(8):
-                      x_start = np.random.uniform(20, 80)
-                      y_start = np.random.uniform(20, 70)
-                      dx = np.random.uniform(-15, 15)
-                      dy = np.random.uniform(10, 25)
-                      ax.arrow(x_start, y_start, dx, dy, head_width=3, head_length=4, fc='#00e5ff', ec='#ffffff', lw=1.5)
-                  ax.set_xlim(0, 100); ax.set_ylim(0, 100); ax.axis('off')
-
-              path = f"ia_img_{idx}.jpg"
-              plt.savefig(path, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight', pad_inches=0)
-              plt.close(fig)
+          if len(ia_images) >= 4:
+              while len(ia_images) < len(prompts) and len(ia_images) < 6:
+                  ia_images.append(ia_images[-1])
+                  
+              print("\n🎬 Montando infografías en vídeo...")
+              dur_img = dur_total / len(ia_images)
+              with open('ia_list.txt', 'w', encoding='utf-8') as f:
+                  for img in ia_images:
+                      f.write(f"file '{img}'\n")
+                      f.write(f"duration {dur_img:.3f}\n")
+                  f.write(f"file '{ia_images[-1]}'\n")
               
-              # Post-procesamiento: asegurar resolución exacta 1080x1920
-              img = Image.open(path).convert('RGB')
-              img = img.resize((1080, 1920), Image.Resampling.LANCZOS)
-              img.save(path, 'JPEG', quality=95)
-              return path
+              os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
+              
+              if os.path.exists('pexels.mp4') and os.path.getsize('pexels.mp4') > 50000:
+                  print("✅ Fondo Infográfico ensamblado con éxito!")
+                  sys.exit(0)
 
-          print("🛡️ Generando Infografías Tácticas Vectoriales nativas...")
-          for i in range(6):
-              out = render_escena(i, i % 6)
-              ia_images.append(out)
-              print(f"   ✅ Escena táctica {i+1} generada en resolución nativa.")
+          print("\n⚠️ [PARACAÍDAS FINAL] Activando Pexels...")
+          api_key = os.environ.get('PEXELS_API_KEY', '').strip()
+          query = os.environ.get('BUSQUEDA', '').strip() or 'football stadium'
+          downloaded = []
 
-          dur_img = dur_total / len(ia_images)
-          with open('ia_list.txt', 'w', encoding='utf-8') as f:
-              for img in ia_images:
-                  f.write(f"file '{img}'\n")
-                  f.write(f"duration {dur_img:.3f}\n")
-              f.write(f"file '{ia_images[-1]}'\n")
+          def search_pexels(q):
+              if not api_key: return []
+              try:
+                  res = requests.get(f"https://api.pexels.com/videos/search?query={q}&orientation=portrait&size=medium&per_page=15", headers={'Authorization': api_key}, timeout=15).json()
+                  links = []
+                  for v in res.get('videos', []):
+                      for f in sorted(v['video_files'], key=lambda x: x['width']*x['height'], reverse=True):
+                          if f['width'] <= f['height'] and f.get('link'): links.append(f['link']); break
+                  return links
+              except: return []
 
-          os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
-          print("✅ Fondo Infográfico ensamblado con éxito!")
+          links = search_pexels(query) or search_pexels('football pitch aerial stadium')
+          random.shuffle(links)
+          for i, link in enumerate(links[:4]):
+              try:
+                  r = requests.get(link, timeout=30)
+                  if r.status_code == 200:
+                      with open(f'clip_{i}.mp4','wb') as f: f.write(r.content)
+                      downloaded.append(f'clip_{i}.mp4')
+              except: pass
+
+          if not downloaded:
+              os.system('ffmpeg -y -f lavfi -i "color=c=#0A0A0A:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
+          else:
+              with open('concat_list.txt','w') as f:
+                  for i, clip in enumerate(downloaded):
+                      out = f'norm_{i}.mp4'
+                      os.system(f'ffmpeg -y -i {clip} -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -an {out} 2>/dev/null')
+                      f.write(f"file '{out}'\n")
+              os.system('ffmpeg -y -f concat -safe 0 -i concat_list.txt -c copy pexels.mp4 2>/dev/null')
           PYTHON_BG
 
           python3 /tmp/gen_bg.py
