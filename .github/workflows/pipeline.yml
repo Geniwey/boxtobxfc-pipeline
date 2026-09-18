@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v34.0 (MOTOR UNREAL - FONDOS PROCEDIMENTALES)
+# ⚽ BOX TO BOX FC - PIPELINE v36.0 (RULETA FORZADA + VARIEDAD ABSOLUTA)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v34.0"
+name: "Box to Box FC - Pipeline v36.0"
 
 concurrency:
   group: render-b2b-unico
@@ -52,21 +52,6 @@ jobs:
           python3 -m pip install --quiet matplotlib scipy openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet matplotlib scipy openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
-          STYLE_INDEX=$((RANDOM % 3))
-          echo "STYLE_INDEX=$STYLE_INDEX" >> $GITHUB_ENV
-          if [ "$STYLE_INDEX" = "0" ]; then echo "HIGHLIGHT_ASS_COLOR=&H0000D7FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFFD700" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.04:saturation=1.25:contrast=1.08" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-300" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=DORADO"
-          elif [ "$STYLE_INDEX" = "1" ]; then echo "HIGHLIGHT_ASS_COLOR=&H00FFE500&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0x00E5FF" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.08:saturation=0.95:contrast=1.15" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-260" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CIAN"
-          else echo "HIGHLIGHT_ASS_COLOR=&H000045FF&" >> $GITHUB_ENV; echo "BAR_COLOR_HEX=0xFF4500" >> $GITHUB_ENV; echo "EQ_FILTRO=brightness=-0.02:saturation=1.4:contrast=1.0" >> $GITHUB_ENV; echo "HOOK_Y_OFFSET=-340" >> $GITHUB_ENV; echo "ESTILO_NOMBRE=CORAL"
-          fi
-
-          MOVEMENT_INDEX=$((RANDOM % 4))
-          echo "MOVEMENT_INDEX=$MOVEMENT_INDEX" >> $GITHUB_ENV
-          if [ "$MOVEMENT_INDEX" = "0" ]; then echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0003\,1.22)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
-          elif [ "$MOVEMENT_INDEX" = "1" ]; then echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.0007\,1.35)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
-          elif [ "$MOVEMENT_INDEX" = "2" ]; then echo "ZOOM_EXPR=zoompan=z='min(max(zoom\,pzoom)+0.00015\,1.10)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920," >> $GITHUB_ENV
-          else echo "ZOOM_EXPR=" >> $GITHUB_ENV
-          fi
-
       - name: "📝 Extraer y sanear textos"
         id: extraer
         timeout-minutes: 2
@@ -111,12 +96,9 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual (Motor UNREAL Procedimental)"
+      - name: "🎙️🎨 Generador Visual (Ruleta Forzada)"
         id: audio_bg_gen
         timeout-minutes: 30
-        env:
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           AUDIO_OK=false
           edge-tts --voice "es-ES-AlvaroNeural" --rate="+15%" --volume="+10%" --file script_audio.txt --write-media audio.mp3 2>/dev/null || true
@@ -132,7 +114,7 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, random, io
+          import os, sys, json, random
           import numpy as np
           import matplotlib
           matplotlib.use('Agg')
@@ -142,155 +124,116 @@ jobs:
           from PIL import Image
 
           dur_total = float(open('dur.txt').read().strip())
-          try:
-              payload = json.load(open('payload.json', 'r', encoding='utf-8'))
-              prompts = payload.get('prompts_imagenes', [])
-          except:
-              prompts = []
-              
-          if not isinstance(prompts, list) or len(prompts) == 0:
-              prompts = []
+
+          # SISTEMA DE TEMAS DINÁMICOS AMPLIADO
+          temas = [
+              {'name': 'CYBERPUNK', 'bg': '#09090b', 'line': '#27272a', 'c1': '#00f6ff', 'c2': '#ff007f', 'text': '#ffffff'},
+              {'name': 'GOLD_PREMIUM', 'bg': '#121212', 'line': '#3f3f46', 'c1': '#fbbf24', 'c2': '#ffffff', 'text': '#fbbf24'},
+              {'name': 'ELECTRIC_TURF', 'bg': '#062615', 'line': '#059669', 'c1': '#34d399', 'c2': '#fcd34d', 'text': '#ffffff'},
+              {'name': 'BLOOD_ALERT', 'bg': '#1a0505', 'line': '#450a0a', 'c1': '#ef4444', 'c2': '#ffffff', 'text': '#fca5a5'},
+              {'name': 'DEEP_SEA', 'bg': '#041626', 'line': '#0369a1', 'c1': '#38bdf8', 'c2': '#2dd4bf', 'text': '#e0f2fe'}
+          ]
+          tema = random.choice(temas)
+
+          # Exportar colores para los subtítulos y la barra de progreso
+          def h2a(h):
+              h = h.lstrip('#')
+              return f"&H00{h[4:6]}{h[2:4]}{h[0:2]}&"
+          
+          with open('theme.env', 'w') as f:
+              f.write(f"THEME_NAME={tema['name']}\n")
+              f.write(f"BAR_COLOR_HEX=0x{tema['c1'].lstrip('#')}\n")
+              f.write(f"HIGHLIGHT_ASS_COLOR={h2a(tema['c1'])}\n")
 
           ia_images = []
 
-          def generar_fondo_procedimental():
-              # Crea una imagen base de césped realista con franjas y viñeteado
-              width, height = 1080, 1920
-              img = Image.new('RGB', (width, height))
-              pixels = img.load()
+          # RULETA FORZADA: Independientemente de lo que diga Groq, obligamos a Python a variar
+          tipos_obligatorios = ['heatmap', 'radar', 'network', 'bar', 'shot', 'tactical']
+          random.shuffle(tipos_obligatorios)
 
-              # Colores base del césped (más oscuros y saturados)
-              color_base_1 = (10, 45, 20)
-              color_base_2 = (15, 55, 25)
-
-              for y in range(height):
-                  # Franjas del césped (cada 80 píxeles aprox)
-                  color_actual = color_base_1 if (y // 120) % 2 == 0 else color_base_2
-                  
-                  # Ruido para simular textura
-                  for x in range(width):
-                      ruido = random.randint(-5, 5)
-                      r = max(0, min(255, color_actual[0] + ruido))
-                      g = max(0, min(255, color_actual[1] + ruido))
-                      b = max(0, min(255, color_actual[2] + ruido))
-                      
-                      # Efecto viñeta (más oscuro en los bordes)
-                      dist_x = abs(x - width/2) / (width/2)
-                      dist_y = abs(y - height/2) / (height/2)
-                      vignette = max(0, 1 - (dist_x**2 + dist_y**2) * 0.4)
-                      
-                      r = int(r * vignette)
-                      g = int(g * vignette)
-                      b = int(b * vignette)
-                      
-                      pixels[x, y] = (r, g, b)
-              return img
-
-          bg_img_raw = generar_fondo_procedimental()
-          bg_img_raw.save("temp_bg.jpg", "JPEG")
-          bg_array = plt.imread("temp_bg.jpg")
-
-          def dibujar_escena_premium(idx, prompt_text):
-              p_lower = prompt_text.lower()
-              if 'radar' in p_lower: tipo = 'radar'
-              elif 'heatmap' in p_lower or 'heat map' in p_lower: tipo = 'heatmap'
-              elif 'network' in p_lower or 'pass' in p_lower: tipo = 'network'
-              elif 'bar' in p_lower or 'possession' in p_lower: tipo = 'bar'
-              elif 'shot' in p_lower or 'goal' in p_lower: tipo = 'shot'
-              else: tipo = 'tactical'
-
+          def dibujar_escena(idx, tipo_grafico):
               fig, ax = plt.subplots(figsize=(10.8, 19.2), dpi=100)
-              fig.patch.set_facecolor('#000000')
+              fig.patch.set_facecolor(tema['bg'])
+              ax.set_facecolor(tema['bg'])
               
-              # 1. Fondo fotorrealista generado por código
-              ax.imshow(bg_array, extent=[0, 100, 0, 100], aspect='auto')
-              
-              # 2. Cuadrícula táctica HUD
-              for i in range(10, 100, 10):
-                  ax.plot([i, i], [0, 100], color='white', alpha=0.05, lw=1, zorder=1)
-                  ax.plot([0, 100], [i, i], color='white', alpha=0.05, lw=1, zorder=1)
+              zoom_half = random.choice([True, False]) if tipo_grafico in ['heatmap', 'network', 'tactical', 'shot'] else False
 
-              # Colores Neón Premium
-              c_linea = '#ffffff' # Blanco brillante para líneas de campo
-              c_acento = '#00ffaa' # Verde Neón
-              c_secundario = '#ff0055' # Rosa Neón
-              
-              # 3. Dibujamos las líneas del campo MÁS GRUESAS y con "glow"
-              ax.plot([5, 95, 95, 5, 5], [5, 5, 95, 95, 5], color=c_linea, lw=4, zorder=2, alpha=0.8)
-              ax.plot([5, 95], [50, 50], color=c_linea, lw=4, zorder=2, alpha=0.8)
-              ax.add_patch(Circle((50, 50), 12, color=c_linea, fill=False, lw=4, zorder=2, alpha=0.8))
-              ax.plot([25, 75, 75, 25, 25], [5, 5, 25, 25, 5], color=c_linea, lw=3, zorder=2, alpha=0.8)
-              ax.plot([25, 75, 75, 25, 25], [95, 95, 75, 75, 95], color=c_linea, lw=3, zorder=2, alpha=0.8)
+              if tipo_grafico in ['heatmap', 'network', 'tactical', 'shot']:
+                  # Dibuja el campo de fútbol
+                  ax.plot([5, 95, 95, 5, 5], [5, 5, 95, 95, 5], color=tema['line'], lw=4, zorder=1)
+                  ax.plot([5, 95], [50, 50], color=tema['line'], lw=4, zorder=1)
+                  ax.add_patch(Circle((50, 50), 12, color=tema['line'], fill=False, lw=4, zorder=1))
+                  ax.plot([25, 75, 75, 25, 25], [5, 5, 20, 20, 5], color=tema['line'], lw=3, zorder=1)
+                  ax.plot([25, 75, 75, 25, 25], [95, 95, 80, 80, 95], color=tema['line'], lw=3, zorder=1)
 
-              # 4. Datos visuales (Mucho más grandes y brillantes)
-              if tipo == 'heatmap':
-                  x = np.random.normal(loc=random.choice([25, 75]), scale=12, size=5000)
-                  y = np.random.normal(loc=random.choice([25, 75]), scale=15, size=5000)
-                  # Colormap personalizado para fuego realista
-                  cmap = mcolors.LinearSegmentedColormap.from_list("", ["transparent", "yellow", "orange", "red"])
-                  ax.hist2d(x, y, bins=40, cmap=cmap, alpha=0.85, range=[[5, 95], [5, 95]], zorder=3)
+                  if zoom_half: ax.set_ylim(45, 100) 
+                  else: ax.set_ylim(0, 100)
+                  ax.set_xlim(0, 100)
+              else:
+                  # Para radares y barras, dibuja cuadrícula abstracta
+                  for i in range(10, 100, 10):
+                      ax.plot([i, i], [0, 100], color=tema['line'], alpha=0.3, lw=1, zorder=1)
+                      ax.plot([0, 100], [i, i], color=tema['line'], alpha=0.3, lw=1, zorder=1)
+                  ax.set_xlim(0, 100); ax.set_ylim(0, 100)
+
+              # DIBUJO DE DATOS ESPECÍFICOS
+              if tipo_grafico == 'heatmap':
+                  x = np.random.normal(loc=random.choice([30, 50, 70]), scale=12, size=4000)
+                  y = np.random.normal(loc=random.choice([60, 80]) if zoom_half else random.choice([30, 70]), scale=15, size=4000)
+                  cmap = mcolors.LinearSegmentedColormap.from_list("", ["transparent", tema['c1'], tema['c2']])
+                  ax.hist2d(x, y, bins=40, cmap=cmap, alpha=0.9, range=[[5, 95], [5, 95]], zorder=3)
               
-              elif tipo == 'network':
-                  nx = np.random.uniform(20, 80, 11)
-                  ny = np.random.uniform(20, 80, 11)
-                  for i in range(11):
-                      for j in range(i+1, 11):
-                          if random.random() > 0.6:
-                              # Líneas de conexión más gruesas
-                              ax.plot([nx[i], nx[j]], [ny[i], ny[j]], color=c_acento, lw=random.uniform(2,5), alpha=0.7, zorder=3)
-                  # Nodos de jugadores muy visibles
-                  ax.scatter(nx, ny, s=800, color=c_secundario, edgecolors='white', lw=3, zorder=4)
-                  # Números en los nodos
-                  for i in range(11):
-                      ax.text(nx[i], ny[i], str(i+1), color='white', ha='center', va='center', size=14, weight='bold', zorder=5)
+              elif tipo_grafico == 'network':
+                  nx = np.random.uniform(15, 85, 9)
+                  ny = np.random.uniform(50, 90, 9) if zoom_half else np.random.uniform(15, 85, 9)
+                  for i in range(9):
+                      for j in range(i+1, 9):
+                          if random.random() > 0.5:
+                              ax.plot([nx[i], nx[j]], [ny[i], ny[j]], color=tema['c1'], lw=random.uniform(1,4), alpha=0.8, zorder=3)
+                  ax.scatter(nx, ny, s=600, color=tema['c2'], edgecolors=tema['bg'], lw=3, zorder=4)
               
-              elif tipo == 'radar':
-                  cats = 5
+              elif tipo_grafico == 'radar':
+                  cats = 6
                   angs = np.linspace(0, 2*np.pi, cats, endpoint=False)
                   angs = np.append(angs, angs[0])
                   for r in [0.2, 0.4, 0.6, 0.8, 1.0]:
-                      ax.plot(50 + 30*r*np.cos(angs), 50 + 30*r*np.sin(angs), color='white', lw=1.5, alpha=0.5, zorder=3)
-                  vals = np.random.uniform(0.4, 1.0, cats)
+                      ax.plot(50 + 35*r*np.cos(angs), 50 + 35*r*np.sin(angs), color=tema['line'], lw=2, zorder=2)
+                  vals = np.random.uniform(0.3, 1.0, cats)
                   vals = np.append(vals, vals[0])
-                  xs, ys = 50 + 30*vals*np.cos(angs), 50 + 30*vals*np.sin(angs)
-                  ax.plot(xs, ys, color=c_acento, lw=4, zorder=4)
-                  ax.fill(xs, ys, color=c_acento, alpha=0.6, zorder=3)
-                  labels = ['ATAQUE', 'DEFENSA', 'POSESIÓN', 'TÁCTICA', 'FÍSICO']
+                  xs, ys = 50 + 35*vals*np.cos(angs), 50 + 35*vals*np.sin(angs)
+                  ax.plot(xs, ys, color=tema['c1'], lw=4, zorder=4)
+                  ax.fill(xs, ys, color=tema['c1'], alpha=0.4, zorder=3)
+                  labels = ['ATAQUE', 'DEFENSA', 'RITMO', 'TÁCTICA', 'FÍSICO', 'PASE']
                   for i, l in enumerate(labels):
-                      # Fondo negro para el texto para que lea perfecto
-                      ax.text(50 + 38*np.cos(angs[i]), 50 + 38*np.sin(angs[i]), l, color='white', ha='center', va='center', size=18, weight='bold', bbox=dict(facecolor='black', alpha=0.7, edgecolor='none'), zorder=5)
+                      ax.text(50 + 42*np.cos(angs[i]), 50 + 42*np.sin(angs[i]), l, color=tema['text'], ha='center', va='center', size=16, weight='bold', zorder=5)
               
-              elif tipo == 'bar':
-                  metrics = ['Posesión', 'Acierto Pase', 'xG Esperados', 'Duelos Ganados', 'Tiros Puerta']
+              elif tipo_grafico == 'bar':
+                  metrics = ['Posesión', 'Acierto Pase', 'Duelos', 'Tiros', 'xG']
                   vals = np.random.uniform(30, 85, 5)
                   y_pos = np.linspace(20, 80, 5)
-                  ax.barh(y_pos, [60]*5, left=20, color='black', alpha=0.7, height=6, zorder=3)
-                  ax.barh(y_pos, vals, left=20, color=c_secundario, height=6, zorder=4)
+                  ax.barh(y_pos, [70]*5, left=15, color=tema['line'], height=5, zorder=3)
+                  ax.barh(y_pos, vals, left=15, color=tema['c2'], height=5, zorder=4)
                   for i, m in enumerate(metrics):
-                      ax.text(20, y_pos[i]+4, m, color='white', size=18, weight='bold', zorder=5, bbox=dict(facecolor='black', alpha=0.5, edgecolor='none', pad=2))
+                      ax.text(15, y_pos[i]+4, m, color=tema['text'], size=18, weight='bold', zorder=5)
               
-              elif tipo == 'shot':
-                  sx = np.random.uniform(30, 70, 20)
-                  sy = np.random.uniform(70, 90, 20)
-                  sz = np.random.uniform(200, 800, 20)
-                  sc = [c_secundario if s > 400 else c_acento for s in sz]
-                  ax.scatter(sx, sy, s=sz, c=sc, alpha=0.9, edgecolors='white', lw=2, zorder=3)
+              elif tipo_grafico == 'shot':
+                  sx = np.random.uniform(30, 70, 15)
+                  sy = np.random.uniform(75, 95, 15) if zoom_half else np.random.uniform(65, 95, 15)
+                  sz = np.random.uniform(100, 700, 15)
+                  sc = [tema['c2'] if s > 400 else tema['c1'] for s in sz]
+                  ax.scatter(sx, sy, s=sz, c=sc, alpha=0.9, edgecolors=tema['bg'], lw=2, zorder=3)
               
-              else:
-                  for _ in range(5):
+              else: # Tactical Arrows
+                  for _ in range(6):
                       xs = np.random.uniform(20, 80)
-                      ys = np.random.uniform(20, 60)
-                      dx = np.random.uniform(-20, 20)
-                      dy = np.random.uniform(20, 40)
-                      ax.arrow(xs, ys, dx, dy, head_width=4, head_length=6, fc=c_acento, ec='white', lw=4, zorder=3)
+                      ys = np.random.uniform(50, 70) if zoom_half else np.random.uniform(20, 60)
+                      dx = np.random.uniform(-25, 25)
+                      dy = np.random.uniform(15, 30)
+                      ax.arrow(xs, ys, dx, dy, head_width=3, head_length=5, fc=tema['c1'], ec=tema['bg'], lw=4, zorder=3)
 
-              # 5. Detalles de la interfaz HUD (Más grandes y visibles)
-              ax.text(8, 97, f"B2B_SYS // {tipo.upper()}_ANALYSIS", color='white', size=16, weight='bold', bbox=dict(facecolor='black', alpha=0.8, edgecolor=c_acento, lw=2), zorder=5)
+              ax.text(5, 96, f" SYS.{tipo_grafico.upper()} // {tema['name']}", color=tema['c1'], size=14, weight='bold', zorder=6)
 
-              ax.set_xlim(0, 100)
-              ax.set_ylim(0, 100)
               ax.axis('off')
-              
               path = f"ia_img_{idx}.jpg"
               plt.savefig(path, bbox_inches='tight', pad_inches=0, dpi=100)
               plt.close(fig)
@@ -299,11 +242,12 @@ jobs:
               img.save(path, 'JPEG', quality=95)
               return path
 
-          print("🛡️ Arrancando Motor Gráfico UNREAL PROCEDIMENTAL...")
-          for i, p in enumerate(prompts):
-              out = dibujar_escena_premium(i, p)
+          print(f"🛡️ Arrancando Ruleta Forzada. Tema: {tema['name']}")
+          # Generamos las 6 imágenes obligando a Python a usar los 6 tipos distintos
+          for i in range(6):
+              tipo_forzado = tipos_obligatorios[i % 6]
+              out = dibujar_escena(i, tipo_forzado)
               ia_images.append(out)
-              print(f"   ✅ Gráfico Procedimental {i+1} renderizado.")
 
           dur_img = dur_total / len(ia_images)
           with open('ia_list.txt', 'w', encoding='utf-8') as f:
@@ -312,8 +256,7 @@ jobs:
                   f.write(f"duration {dur_img:.3f}\n")
               f.write(f"file '{ia_images[-1]}'\n")
 
-          os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4 2>/dev/null')
-          print("✅ Fondo Infográfico ensamblado con éxito!")
+          print("✅ Secuencia visual generada. Ensamblando...")
           PYTHON_BG
 
           python3 /tmp/gen_bg.py
@@ -321,6 +264,7 @@ jobs:
       - name: "💬 Generar subtítulos animados (Whisper)"
         timeout-minutes: 15
         run: |
+          source theme.env
           python3 -c "
           import whisper, json, sys
           sys.stdout.reconfigure(encoding='utf-8')
@@ -392,11 +336,12 @@ jobs:
           open('subtitles.ass','w',encoding='utf-8').write(header+'\n'+'\n'.join(lines))
           PYTHON_ASS
 
-          FONT_NAME=$FONT_NAME HIGHLIGHT_ASS_COLOR=$HIGHLIGHT_ASS_COLOR python3 /tmp/gen_ass.py
+          python3 /tmp/gen_ass.py
 
       - name: "🎬 Renderizar vídeo Box to Box FC"
         timeout-minutes: 20
         run: |
+          source theme.env
           DUR=$(cat dur.txt)
           ASS_PATH=$(realpath subtitles.ass)
           ASS_ESC=$(echo "$ASS_PATH" | sed 's/:/\\:/g')
@@ -412,15 +357,22 @@ jobs:
           draw.rectangle([0,0,320,72],fill=(10,10,10,200))
           try:
               font = ImageFont.truetype(os.path.expanduser('~/.fonts/BebasNeue.ttf'),46)
-              draw.text((12,12),'BOX TO BOX FC',font=font,fill='#FFD700')
+              draw.text((12,12),'BOX TO BOX FC',font=font,fill='#FFFFFF')
           except:
-              draw.text((12,20),'BOX TO BOX FC',fill='#FFD700')
+              draw.text((12,20),'BOX TO BOX FC',fill='#FFFFFF')
           img.save('logo.png')
           " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
           fi
 
+          # Zoom y Paneo aleatorio para dar movimiento y matar la monotonía
+          ZOOM_EXPR=$(python3 -c "import random; print(random.choice([
+            \"zoompan=z='min(max(zoom\,pzoom)+0.0007\,1.3)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'\",
+            \"zoompan=z='min(max(zoom\,pzoom)+0.0004\,1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih-(ih/zoom)'\",
+            \"zoompan=z='min(max(zoom\,pzoom)+0.0004\,1.15)':d=1:x='iw/2-(iw/zoom/2)':y='0'\"
+          ]))")
+
           ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i logo.png \
-            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,${ZOOM_EXPR}eq=${EQ_FILTRO}[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2${HOOK_Y_OFFSET}:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=${BAR_COLOR_HEX}@0.95:t=fill[outv]" \
+            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,${ZOOM_EXPR}[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2-300:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=${BAR_COLOR_HEX}@0.95:t=fill[outv]" \
             -map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -t "$DUR" -movflags +faststart output.mp4
 
       - name: "📺 Publicar en YouTube"
