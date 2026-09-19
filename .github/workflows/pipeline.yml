@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v36.0 (RULETA FORZADA + VARIEDAD ABSOLUTA)
+# ⚽ BOX TO BOX FC - PIPELINE v37.0 (RULETA FORZADA + FIX TRANSPARENCIAS)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v36.0"
+name: "Box to Box FC - Pipeline v37.0"
 
 concurrency:
   group: render-b2b-unico
@@ -180,7 +180,8 @@ jobs:
               if tipo_grafico == 'heatmap':
                   x = np.random.normal(loc=random.choice([30, 50, 70]), scale=12, size=4000)
                   y = np.random.normal(loc=random.choice([60, 80]) if zoom_half else random.choice([30, 70]), scale=15, size=4000)
-                  cmap = mcolors.LinearSegmentedColormap.from_list("", ["transparent", tema['c1'], tema['c2']])
+                  # FIX TRANSPARENCIA APLICADO AQUÍ (0,0,0,0 en lugar de "transparent")
+                  cmap = mcolors.LinearSegmentedColormap.from_list("", [(0,0,0,0), tema['c1'], tema['c2']])
                   ax.hist2d(x, y, bins=40, cmap=cmap, alpha=0.9, range=[[5, 95], [5, 95]], zorder=3)
               
               elif tipo_grafico == 'network':
