@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v38.0 (RULETA FORZADA + FIX LINUX SYNTAX)
+# ⚽ BOX TO BOX FC - PIPELINE v39.0 (VERTICAL FIX + GRÁFICOS CONTEXTUALES REALES)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v38.0"
+name: "Box to Box FC - Pipeline v39.0"
 
 concurrency:
   group: render-b2b-unico
@@ -96,7 +96,7 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual (Ruleta Forzada)"
+      - name: "🎙️🎨 Generador Visual (Contextual Inteligente)"
         id: audio_bg_gen
         timeout-minutes: 30
         run: |
@@ -114,7 +114,7 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, random
+          import os, sys, json, random, re
           import numpy as np
           import matplotlib
           matplotlib.use('Agg')
@@ -125,7 +125,15 @@ jobs:
 
           dur_total = float(open('dur.txt').read().strip())
 
-          # SISTEMA DE TEMAS DINÁMICOS AMPLIADO
+          try:
+              payload = json.load(open('payload.json', 'r', encoding='utf-8'))
+              prompts = payload.get('prompts_imagenes', [])
+          except: prompts = []
+          
+          if not prompts or len(prompts) < 6: 
+              prompts = ["heatmap", "radar", "network", "bar", "shot", "tactical"]
+
+          # TEMAS DINÁMICOS
           temas = [
               {'name': 'CYBERPUNK', 'bg': '#09090b', 'line': '#27272a', 'c1': '#00f6ff', 'c2': '#ff007f', 'text': '#ffffff'},
               {'name': 'GOLD_PREMIUM', 'bg': '#121212', 'line': '#3f3f46', 'c1': '#fbbf24', 'c2': '#ffffff', 'text': '#fbbf24'},
@@ -135,7 +143,6 @@ jobs:
           ]
           tema = random.choice(temas)
 
-          # Exportar colores para los subtítulos (CON COMILLAS PARA NO ROMPER LINUX)
           def h2a(h):
               h = h.lstrip('#')
               return f"&H00{h[4:6]}{h[2:4]}{h[0:2]}&"
@@ -147,18 +154,32 @@ jobs:
 
           ia_images = []
 
-          # RULETA FORZADA
-          tipos_obligatorios = ['heatmap', 'radar', 'network', 'bar', 'shot', 'tactical']
-          random.shuffle(tipos_obligatorios)
+          def dibujar_escena_contextual(idx, prompt_text):
+              p_lower = prompt_text.lower()
+              
+              # LECTURA INTELIGENTE DEL PROMPT DE GROQ
+              if 'radar' in p_lower: tipo = 'radar'
+              elif 'heat' in p_lower: tipo = 'heatmap'
+              elif 'network' in p_lower or 'pass' in p_lower: tipo = 'network'
+              elif 'bar' in p_lower or 'compar' in p_lower: tipo = 'bar'
+              elif 'shot' in p_lower or 'goal' in p_lower: tipo = 'shot'
+              else: tipo = 'tactical'
 
-          def dibujar_escena(idx, tipo_grafico):
+              # Extracción limpia del texto para mostrarlo en pantalla como si fuera el software analizando
+              hud_text = re.sub(r'sports analytics.*', '', prompt_text, flags=re.I).strip()
+              hud_text = re.sub(r'digital infographic.*', '', hud_text, flags=re.I).strip()
+              hud_text = re.sub(r'(Top-down tactical football pitch showing a|A digital radar chart analyzing|Tactical passing network with|Bar chart comparing|Abstract digital whiteboard with)', '', hud_text, flags=re.I).strip()
+              hud_text = hud_text.replace(',', '').strip()[:35].upper()
+              if len(hud_text) < 3: hud_text = "TACTICAL LIVE DATA"
+
               fig, ax = plt.subplots(figsize=(10.8, 19.2), dpi=100)
               fig.patch.set_facecolor(tema['bg'])
               ax.set_facecolor(tema['bg'])
               
-              zoom_half = random.choice([True, False]) if tipo_grafico in ['heatmap', 'network', 'tactical', 'shot'] else False
+              # DIVERSIDAD DE CÁMARA BASADA EN EL PROMPT
+              zoom_half = ('half' in p_lower or 'attack' in p_lower or 'goal' in p_lower)
 
-              if tipo_grafico in ['heatmap', 'network', 'tactical', 'shot']:
+              if tipo in ['heatmap', 'network', 'tactical', 'shot']:
                   ax.plot([5, 95, 95, 5, 5], [5, 5, 95, 95, 5], color=tema['line'], lw=4, zorder=1)
                   ax.plot([5, 95], [50, 50], color=tema['line'], lw=4, zorder=1)
                   ax.add_patch(Circle((50, 50), 12, color=tema['line'], fill=False, lw=4, zorder=1))
@@ -174,22 +195,27 @@ jobs:
                       ax.plot([0, 100], [i, i], color=tema['line'], alpha=0.3, lw=1, zorder=1)
                   ax.set_xlim(0, 100); ax.set_ylim(0, 100)
 
-              if tipo_grafico == 'heatmap':
-                  x = np.random.normal(loc=random.choice([30, 50, 70]), scale=12, size=4000)
-                  y = np.random.normal(loc=random.choice([60, 80]) if zoom_half else random.choice([30, 70]), scale=15, size=4000)
+              if tipo == 'heatmap':
+                  # Si el prompt habla de izquierda o derecha, lo movemos
+                  if 'left' in p_lower: loc_x = 25
+                  elif 'right' in p_lower: loc_x = 75
+                  else: loc_x = random.choice([30, 50, 70])
+                  
+                  x = np.random.normal(loc=loc_x, scale=12, size=4000)
+                  y = np.random.normal(loc=80 if zoom_half else random.choice([30, 70]), scale=15, size=4000)
                   cmap = mcolors.LinearSegmentedColormap.from_list("", [(0,0,0,0), tema['c1'], tema['c2']])
                   ax.hist2d(x, y, bins=40, cmap=cmap, alpha=0.9, range=[[5, 95], [5, 95]], zorder=3)
               
-              elif tipo_grafico == 'network':
-                  nx = np.random.uniform(15, 85, 9)
-                  ny = np.random.uniform(50, 90, 9) if zoom_half else np.random.uniform(15, 85, 9)
-                  for i in range(9):
-                      for j in range(i+1, 9):
-                          if random.random() > 0.5:
+              elif tipo == 'network':
+                  nx = np.random.uniform(15, 85, 11)
+                  ny = np.random.uniform(50, 90, 11) if zoom_half else np.random.uniform(15, 85, 11)
+                  for i in range(11):
+                      for j in range(i+1, 11):
+                          if random.random() > 0.6:
                               ax.plot([nx[i], nx[j]], [ny[i], ny[j]], color=tema['c1'], lw=random.uniform(1,4), alpha=0.8, zorder=3)
-                  ax.scatter(nx, ny, s=600, color=tema['c2'], edgecolors=tema['bg'], lw=3, zorder=4)
+                  ax.scatter(nx, ny, s=500, color=tema['c2'], edgecolors=tema['bg'], lw=3, zorder=4)
               
-              elif tipo_grafico == 'radar':
+              elif tipo == 'radar':
                   cats = 6
                   angs = np.linspace(0, 2*np.pi, cats, endpoint=False)
                   angs = np.append(angs, angs[0])
@@ -200,12 +226,14 @@ jobs:
                   xs, ys = 50 + 35*vals*np.cos(angs), 50 + 35*vals*np.sin(angs)
                   ax.plot(xs, ys, color=tema['c1'], lw=4, zorder=4)
                   ax.fill(xs, ys, color=tema['c1'], alpha=0.4, zorder=3)
-                  labels = ['ATAQUE', 'DEFENSA', 'RITMO', 'TÁCTICA', 'FÍSICO', 'PASE']
+                  # Variedad de métricas en el radar
+                  opciones_stats = ['ATAQUE', 'DEFENSA', 'RITMO', 'TÁCTICA', 'FÍSICO', 'PASE', 'XG', 'PRESIÓN', 'REGATE']
+                  labels = random.sample(opciones_stats, 6)
                   for i, l in enumerate(labels):
                       ax.text(50 + 42*np.cos(angs[i]), 50 + 42*np.sin(angs[i]), l, color=tema['text'], ha='center', va='center', size=16, weight='bold', zorder=5)
               
-              elif tipo_grafico == 'bar':
-                  metrics = ['Posesión', 'Acierto Pase', 'Duelos', 'Tiros', 'xG']
+              elif tipo == 'bar':
+                  metrics = random.sample(['Posesión', 'Acierto Pase', 'Duelos', 'Tiros', 'xG', 'Faltas', 'Córners'], 5)
                   vals = np.random.uniform(30, 85, 5)
                   y_pos = np.linspace(20, 80, 5)
                   ax.barh(y_pos, [70]*5, left=15, color=tema['line'], height=5, zorder=3)
@@ -213,22 +241,24 @@ jobs:
                   for i, m in enumerate(metrics):
                       ax.text(15, y_pos[i]+4, m, color=tema['text'], size=18, weight='bold', zorder=5)
               
-              elif tipo_grafico == 'shot':
+              elif tipo == 'shot':
                   sx = np.random.uniform(30, 70, 15)
-                  sy = np.random.uniform(75, 95, 15) if zoom_half else np.random.uniform(65, 95, 15)
+                  sy = np.random.uniform(75, 95, 15)
                   sz = np.random.uniform(100, 700, 15)
                   sc = [tema['c2'] if s > 400 else tema['c1'] for s in sz]
                   ax.scatter(sx, sy, s=sz, c=sc, alpha=0.9, edgecolors=tema['bg'], lw=2, zorder=3)
               
-              else: # Tactical Arrows
-                  for _ in range(6):
+              else: # Tactical Arrows (Ataques dirigidos)
+                  dir_x = 0 if 'center' in p_lower else (-20 if 'left' in p_lower else (20 if 'right' in p_lower else random.uniform(-25, 25)))
+                  for _ in range(5):
                       xs = np.random.uniform(20, 80)
                       ys = np.random.uniform(50, 70) if zoom_half else np.random.uniform(20, 60)
-                      dx = np.random.uniform(-25, 25)
+                      dx = dir_x + random.uniform(-10, 10)
                       dy = np.random.uniform(15, 30)
                       ax.arrow(xs, ys, dx, dy, head_width=3, head_length=5, fc=tema['c1'], ec=tema['bg'], lw=4, zorder=3)
 
-              ax.text(5, 96, f" SYS.{tipo_grafico.upper()} // {tema['name']}", color=tema['c1'], size=14, weight='bold', zorder=6)
+              # CABECERA HUD INTELIGENTE (Muestra lo que Groq pidió)
+              ax.text(5, 96, f" SYS.{tipo.upper()} // {hud_text}", color=tema['c1'], size=14, weight='bold', zorder=6)
 
               ax.axis('off')
               path = f"ia_img_{idx}.jpg"
@@ -239,10 +269,10 @@ jobs:
               img.save(path, 'JPEG', quality=95)
               return path
 
-          print(f"🛡️ Arrancando Ruleta Forzada. Tema: {tema['name']}")
-          for i in range(6):
-              tipo_forzado = tipos_obligatorios[i % 6]
-              out = dibujar_escena(i, tipo_forzado)
+          print(f"🛡️ Arrancando Motor Contextual Inteligente. Tema: {tema['name']}")
+          # Leemos y procesamos los prompts EXACTOS que mandó Groq
+          for i, p in enumerate(prompts):
+              out = dibujar_escena_contextual(i, p)
               ia_images.append(out)
 
           dur_img = dur_total / len(ia_images)
@@ -253,12 +283,6 @@ jobs:
               f.write(f"file '{ia_images[-1]}'\n")
 
           print("✅ Secuencia visual generada. Ensamblando...")
-          res = os.system('ffmpeg -y -f concat -safe 0 -i ia_list.txt -vf "scale=1080:1920,setsar=1,fps=30" -c:v libx264 -preset fast -crf 23 -b:v 2M -maxrate 2M -bufsize 1M -pix_fmt yuv420p pexels.mp4')
-          
-          # SEGURO DE VIDA PARA PEXELS.MP4
-          if res != 0 or not os.path.exists('pexels.mp4'):
-              print("⚠️ Failsafe activado: Generando fondo base.")
-              os.system('ffmpeg -y -f lavfi -i "color=c=black:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4')
           PYTHON_BG
 
           python3 /tmp/gen_bg.py
@@ -366,10 +390,11 @@ jobs:
           " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
           fi
 
+          # CORRECCIÓN VITAL: Se ha añadido s=1080x1920 para asegurar que el vídeo salga en formato SHORT vertical 9:16
           ZOOM_EXPR=$(python3 -c "import random; print(random.choice([
-            \"zoompan=z='min(max(zoom\,pzoom)+0.0007\,1.3)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'\",
-            \"zoompan=z='min(max(zoom\,pzoom)+0.0004\,1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih-(ih/zoom)'\",
-            \"zoompan=z='min(max(zoom\,pzoom)+0.0004\,1.15)':d=1:x='iw/2-(iw/zoom/2)':y='0'\"
+            \"zoompan=z='min(max(zoom\,pzoom)+0.0007\,1.3)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920\",
+            \"zoompan=z='min(max(zoom\,pzoom)+0.0004\,1.15)':d=1:x='iw/2-(iw/zoom/2)':y='ih-(ih/zoom)':s=1080x1920\",
+            \"zoompan=z='min(max(zoom\,pzoom)+0.0004\,1.15)':d=1:x='iw/2-(iw/zoom/2)':y='0':s=1080x1920\"
           ]))")
 
           ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i logo.png \
