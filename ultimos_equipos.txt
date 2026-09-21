@@ -1,4 +1,3 @@
-España
 Atletico de Madrid
 Alemania
 Manchester City
@@ -8,3 +7,4 @@ Just Fontaine
 Brasil
 Inter de Milan
 Barcelona
+Liverpool
