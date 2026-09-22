@@ -1,4 +1,3 @@
-Paris Saint-Germain
 Inter de Milan
 Alemania
 Brasil
@@ -8,3 +7,4 @@ Real Madrid
 Leicester City
 Manchester City
 Hakan Sukur
+Bayern Munich
