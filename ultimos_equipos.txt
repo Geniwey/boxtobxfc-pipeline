@@ -1,4 +1,3 @@
-Inglaterra
 Alemania
 Bayern Munich
 Leicester City
@@ -8,3 +7,4 @@ Barcelona
 Brasil
 Hakan Sukur
 Real Madrid
+Juventus
