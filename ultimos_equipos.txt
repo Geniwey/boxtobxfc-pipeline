@@ -1,5 +1,4 @@
 Just Fontaine
-Just Fontaine
 Chelsea
 Alemania
 Leicester City
@@ -8,3 +7,4 @@ Barcelona
 Manchester City
 Juventus
 Argentina
+Brasil
