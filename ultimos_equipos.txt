@@ -1,4 +1,3 @@
-Just Fontaine
 Atletico de Madrid
 Chelsea
 Leicester City
@@ -8,3 +7,4 @@ Inter de Milan
 Manchester City
 Real Madrid
 Brasil
+Hakan Sukur
