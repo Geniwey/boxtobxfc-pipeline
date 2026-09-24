@@ -1,4 +1,3 @@
-Leicester City
 Alemania
 Paris Saint-Germain
 Inter de Milan
@@ -7,4 +6,5 @@ Real Madrid
 Brasil
 Hakan Sukur
 Liverpool
+Just Fontaine
 Just Fontaine
