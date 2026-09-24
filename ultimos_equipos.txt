@@ -1,4 +1,3 @@
-Hakan Sukur
 Real Madrid
 Juventus
 España
@@ -8,3 +7,4 @@ Chelsea
 Leicester City
 Alemania
 Paris Saint-Germain
+Inter de Milan
