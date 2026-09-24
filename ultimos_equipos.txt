@@ -1,4 +1,3 @@
-Liverpool
 Just Fontaine
 Just Fontaine
 Chelsea
@@ -8,3 +7,4 @@ Inter de Milan
 Barcelona
 Manchester City
 Juventus
+Argentina
