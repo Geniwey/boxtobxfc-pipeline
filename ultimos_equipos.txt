@@ -1,4 +1,3 @@
-Barcelona
 Real Madrid
 Brasil
 Juventus
@@ -8,3 +7,4 @@ España
 Leicester City
 Just Fontaine
 Chelsea
+Alemania
