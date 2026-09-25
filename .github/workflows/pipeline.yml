@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v43.0 (DOCUMENTAL + CANDADO ANTI-REPETICIÓN)
+# ⚽ BOX TO BOX FC - PIPELINE v44.0 (PEXELS VÍDEO REAL MEGA POTENCIADO)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v43.0"
+name: "Box to Box FC - Pipeline v44.0"
 
 concurrency:
   group: render-b2b-unico
@@ -96,14 +96,12 @@ jobs:
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎨 Generador Visual (Cine FLUX Anti-Repetición)"
+      - name: "🎙️🎥 Descargador de Vídeos Reales (Pexels Potenciado)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
-          HUGGINGFACE_API_KEY_1: ${{ secrets.HUGGINGFACE_API_KEY_1 }}
-          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           AUDIO_OK=false
           edge-tts --voice "es-ES-AlvaroNeural" --rate="+15%" --volume="+10%" --file script_audio.txt --write-media audio.mp3 2>/dev/null || true
@@ -118,109 +116,81 @@ jobs:
           echo "$DURACION_FINAL" > dur.txt
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
-          cat << 'PYTHON_BG' > /tmp/gen_bg.py
-          import os, sys, json, time, random, urllib.parse, requests
-          from PIL import Image, ImageFilter
+          cat << 'PYTHON_PEXELS' > /tmp/gen_pexels.py
+          import os, sys, random, requests, urllib.parse
           sys.stdout.reconfigure(encoding='utf-8')
 
-          dur_total = float(open('dur.txt').read().strip())
-          try:
-              payload = json.load(open('payload.json', 'r', encoding='utf-8'))
-              prompts = payload.get('prompts_imagenes', [])
-          except: prompts = []
-          
-          # Si llegan menos de 6 prompts, usamos una lista de escenas únicas
-          if not prompts or len(prompts) < 6: 
-              prompts = [
-                  "A hyper-realistic close-up of a stressed football manager in the rain at night, 8k resolution",
-                  "A dark cinematic locker room of a football stadium, highly detailed",
-                  "Close up of a football boot stepping on muddy grass in slow motion",
-                  "An empty massive football stadium at night illuminated by a single glowing red flare",
-                  "A hyper-realistic close-up of a football net tearing from a powerful shot",
-                  "A high-tech digital tactical board glowing in a dark room"
-              ]
+          queries_raw = os.environ.get('BUSQUEDA', 'football match,soccer fans,stadium lights')
+          queries = [q.strip() for q in queries_raw.split(',') if q.strip()]
+          if not queries: queries = ['football match', 'soccer fans', 'stadium stadium']
 
-          hf_key = (os.environ.get('HUGGINGFACE_API_KEY_1', '').strip() or os.environ.get('HUGGINGFACE_API_KEY', '').strip() or os.environ.get('HF_TOKEN', '').strip())
           pexels_key = os.environ.get('PEXELS_API_KEY', '').strip()
-          ia_images = []
+          downloaded_clips = []
 
-          def generar_emergencia_pexels(idx):
-              print("   ▶️ [PARACAÍDAS] Buscando foto real en Pexels...")
-              dest_path = f"ia_img_{idx}.jpg"
+          def descargar_video_pexels(query, idx):
+              print(f"   ▶️ Buscando VÍDEO REAL en Pexels para: '{query}'...")
+              if not pexels_key: return False
               try:
-                  if pexels_key:
-                      url = "https://api.pexels.com/v1/search?query=football+stadium+night&orientation=portrait&per_page=15"
-                      res = requests.get(url, headers={'Authorization': pexels_key}, timeout=15).json()
-                      if 'photos' in res and len(res['photos']) > 0:
-                          foto = random.choice(res['photos'])['src']['large2x']
-                          datos = requests.get(foto, timeout=15).content
-                          with open(dest_path, 'wb') as f: f.write(datos)
-                          img = Image.open(dest_path).convert('RGB').resize((1080, 1920), Image.Resampling.LANCZOS)
-                          img = img.point(lambda p: p * 0.7)
-                          img.save(dest_path, 'JPEG', quality=95)
-                          print("   ✅ ¡Foto real de Pexels rescatada!")
-                          return dest_path
-              except Exception: pass
-              
-              print("   ⚠️ Pexels falló. Usando fondo negro de emergencia.")
-              img = Image.new('RGB', (1080, 1920), color=(5, 5, 5))
-              img.save(dest_path, 'JPEG')
-              return dest_path
-
-          def descargar_imagen_ia(prompt_base, idx):
-              # INYECCIÓN DEL CANDADO ANTI-REPETICIÓN: Metemos un código aleatorio en el propio texto del prompt
-              # para forzar a la IA a generar una imagen completamente nueva cada vez, matando los clones de raíz.
-              codigo_unico = f" scene variant {random.randint(1000000, 9999999)}"
-              prompt_final = prompt_base.strip() + ", photorealistic, cinematic lighting, 8k, sports documentary" + codigo_unico
-              dest_path = f"ia_img_{idx}.jpg"
-              
-              print(f"   ▶️ Atacando Pollinations FLUX...")
-              try:
-                  prompt_enc = urllib.parse.quote(prompt_final)
-                  url = f"https://image.pollinations.ai/prompt/{prompt_enc}?width=1080&height=1920&nologo=true&model=flux"
-                  res = requests.get(url, timeout=45)
-                  if res.status_code == 200 and len(res.content) > 20000:
-                      with open(dest_path, 'wb') as f: f.write(res.content)
-                      img = Image.open(dest_path).convert('RGB').resize((1080, 1920), Image.Resampling.LANCZOS)
-                      img.save(dest_path, 'JPEG', quality=95)
-                      print(f"   ✅ ¡Fotograma Fotorrealista Creado!")
-                      return dest_path
+                  # Buscamos vídeos en formato portrait (vertical) para no perder calidad al recortar
+                  url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=15"
+                  res = requests.get(url, headers={'Authorization': pexels_key}, timeout=15).json()
+                  
+                  if 'videos' in res and len(res['videos']) > 0:
+                      # Elegimos un vídeo al azar de entre los mejores resultados
+                      video_info = random.choice(res['videos'][:8])
+                      best_link = None
+                      
+                      # Buscamos la calidad HD
+                      for f in sorted(video_info['video_files'], key=lambda x: x['width']*x['height'], reverse=True):
+                          if f['width'] <= 1080 and f.get('link'):
+                              best_link = f['link']
+                              break
+                      
+                      if not best_link and len(video_info['video_files']) > 0:
+                          best_link = video_info['video_files'][0]['link']
+                      
+                      if best_link:
+                          video_data = requests.get(best_link, timeout=45).content
+                          clip_name = f"raw_clip_{idx}.mp4"
+                          with open(clip_name, 'wb') as f: f.write(video_data)
+                          
+                          norm_name = f"norm_clip_{idx}.mp4"
+                          # Filtro FFmpeg: Escala a 1080x1920, recorta, ajusta a 30fps y oscurece un poco para los textos (contraste cinemático)
+                          filtro = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,eq=contrast=1.05:saturation=1.1:brightness=-0.05"
+                          os.system(f'ffmpeg -y -i {clip_name} -vf "{filtro}" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -an {norm_name} 2>/dev/null')
+                          print(f"   ✅ Clip '{query}' descargado y procesado.")
+                          return norm_name
               except Exception as e:
-                  print("   ⚠️ Pollinations falló.")
+                  print(f"   ⚠️ Fallo al descargar de Pexels: {e}")
+              return False
 
-              if hf_key:
-                  print(f"   ▶️ Atacando Hugging Face Backup...")
-                  headers = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
-                  try:
-                      res = requests.post("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", headers=headers, json={"inputs": prompt_final}, timeout=45)
-                      if res.status_code == 200:
-                          with open(dest_path, 'wb') as f: f.write(res.content)
-                          img = Image.open(dest_path).convert('RGB').resize((1080, 1920), Image.Resampling.LANCZOS)
-                          img.save(dest_path, 'JPEG', quality=95)
-                          print(f"   ✅ ¡Fotograma Fotorrealista Creado (HF)!")
-                          return dest_path
-                  except: pass
+          print("🛡️ Arrancando Motor Pexels Mega Potenciado...")
+          for i, q in enumerate(queries):
+              clip = descargar_video_pexels(q, i)
+              if clip: downloaded_clips.append(clip)
+
+          # Si han fallado búsquedas, rellenamos con genéricas de fútbol
+          backup_queries = ["football player", "soccer goal", "stadium crowd"]
+          while len(downloaded_clips) < 3 and backup_queries:
+              clip = descargar_video_pexels(backup_queries.pop(), len(downloaded_clips))
+              if clip: downloaded_clips.append(clip)
+
+          if not downloaded_clips:
+              print("   ❌ Pexels falló por completo. Usando fondo oscuro de emergencia.")
+              os.system('ffmpeg -y -f lavfi -i "color=c=#0A0B10:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
+          else:
+              print("🎬 Uniendo clips de vídeo...")
+              with open('concat_list.txt', 'w') as f:
+                  for clip in downloaded_clips:
+                      f.write(f"file '{clip}'\n")
               
-              return generar_emergencia_pexels(idx)
+              os.system('ffmpeg -y -f concat -safe 0 -i concat_list.txt -c copy pexels.mp4 2>/dev/null')
+              
+              if not os.path.exists('pexels.mp4') or os.path.getsize('pexels.mp4') < 10000:
+                  os.system('ffmpeg -y -f lavfi -i "color=c=#0A0B10:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
+          PYTHON_PEXELS
 
-          print(f"🛡️ Desplegando Motor Documental...")
-          for i, p in enumerate(prompts):
-              print(f"\n🎬 Generando Escena {i+1}...")
-              out = descargar_imagen_ia(p, i)
-              ia_images.append(out)
-              time.sleep(3)
-
-          dur_img = dur_total / len(ia_images)
-          with open('ia_list.txt', 'w', encoding='utf-8') as f:
-              for img in ia_images:
-                  f.write(f"file '{img}'\n")
-                  f.write(f"duration {dur_img:.3f}\n")
-              f.write(f"file '{ia_images[-1]}'\n")
-
-          print("✅ Secuencia visual generada. Ensamblando...")
-          PYTHON_BG
-
-          python3 /tmp/gen_bg.py
+          python3 /tmp/gen_pexels.py
 
       - name: "💬 Generar subtítulos animados (Whisper)"
         timeout-minutes: 15
@@ -248,7 +218,7 @@ jobs:
           sys.stdout.reconfigure(encoding='utf-8')
 
           font_name = os.environ.get('FONT_NAME', 'Bebas Neue')
-          highlight_color = "&H0000D7FF&"
+          highlight_color = "&H0000D7FF&" # Dorado vibrante para los subtítulos
 
           def fmt(s): return f"{int(s//3600)}:{int((s%3600)//60):02d}:{int(s%60):02d}.{min(int(round((s%1)*100)),99):02d}"
           def clean(t): return re.sub(r' {2,}',' ',t.replace('{','').replace('}','').replace('\\','').replace('\n',' ')).strip()
@@ -261,6 +231,7 @@ jobs:
           data = json.load(open('audio.json','r',encoding='utf-8'))
           all_words = [{'word': clean(w.get('word','')), 'start': w.get('start',0.0), 'end': w.get('end',0.0)} for s in data.get('segments',[]) for w in s.get('words',[]) if w.get('word','').strip() and w.get('end',0) > w.get('start',0)]
 
+          # Sombra más gruesa para que se lea perfecto sobre el vídeo real
           header = f"""[Script Info]
           ScriptType: v4.00+
           WrapStyle: 0
@@ -298,21 +269,34 @@ jobs:
 
           python3 /tmp/gen_ass.py
 
-      - name: "🎬 Renderizar vídeo Documental Box to Box FC"
+      - name: "🎬 Renderizar Vídeo Final Box to Box FC"
         timeout-minutes: 20
         run: |
           DUR=$(cat dur.txt)
           ASS_PATH=$(realpath subtitles.ass)
           ASS_ESC=$(echo "$ASS_PATH" | sed 's/:/\\:/g')
-          
-          ZOOM_EXPR=$(python3 -c "import random; print(random.choice([
-            \"zoompan=z='min(max(zoom\,pzoom)+0.001\,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920\",
-            \"zoompan=z='min(max(zoom\,pzoom)+0.0008\,1.4)':d=1:x='iw/2-(iw/zoom/2)':y='ih-(ih/zoom)':s=1080x1920\",
-            \"zoompan=z='min(max(zoom\,pzoom)+0.0008\,1.4)':d=1:x='iw/2-(iw/zoom/2)':y='0':s=1080x1920\"
-          ]))")
+          HOOK_PATH=$(realpath hook_text.txt)
+          HOOK_ESC=$(echo "$HOOK_PATH" | sed 's/:/\\:/g')
 
-          ffmpeg -y -f concat -safe 0 -i ia_list.txt -i audio.wav \
-            -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,${ZOOM_EXPR},eq=contrast=1.1:saturation=1.1:brightness=-0.05[bg];[bg]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
+          if [ ! -f "logo.png" ]; then
+            python3 -c "
+          from PIL import Image, ImageDraw, ImageFont
+          import os
+          img = Image.new('RGBA',(320,72),(0,0,0,0))
+          draw = ImageDraw.Draw(img)
+          draw.rectangle([0,0,320,72],fill=(10,10,10,200))
+          try:
+              font = ImageFont.truetype(os.path.expanduser('~/.fonts/BebasNeue.ttf'),46)
+              draw.text((12,12),'BOX TO BOX FC',font=font,fill='#FFFFFF')
+          except:
+              draw.text((12,20),'BOX TO BOX FC',fill='#FFFFFF')
+          img.save('logo.png')
+          " 2>/dev/null || wget -q -O logo.png "https://upload.wikimedia.org/wikipedia/commons/c/ca/1x1.png"
+          fi
+
+          # El stream_loop asegura que si los vídeos de Pexels son cortos, se repitan hasta cubrir el audio
+          ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i logo.png \
+            -filter_complex "[0:v]scale=1080:1920,setsar=1[bg];[2:v]scale=300:-1,colorchannelmixer=aa=0.88[logo];[bg][logo]overlay=W-w-35:H-h-35[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=78:fontcolor=white:borderw=5:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=(h-text_h)/2-300:enable='lt(t\,1.6)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
             -map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -t "$DUR" -movflags +faststart output.mp4
 
       - name: "📺 Publicar en YouTube"
