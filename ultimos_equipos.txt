@@ -1,4 +1,3 @@
-Real Madrid
 Chelsea
 Bayern Munich
 Liverpool
@@ -8,3 +7,4 @@ Argentina
 Barcelona
 Brasil
 Inglaterra
+Manchester City
