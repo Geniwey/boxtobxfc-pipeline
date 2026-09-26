@@ -1,4 +1,3 @@
-Juventus
 Hakan Sukur
 Manchester City
 Paris Saint-Germain
@@ -8,3 +7,4 @@ Argentina
 Alemania
 Leicester City
 Just Fontaine
+Inglaterra
