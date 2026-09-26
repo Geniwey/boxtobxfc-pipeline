@@ -1,4 +1,3 @@
-Chelsea
 Bayern Munich
 Liverpool
 Inter de Milan
@@ -8,3 +7,4 @@ Barcelona
 Brasil
 Inglaterra
 Manchester City
+Atletico de Madrid
