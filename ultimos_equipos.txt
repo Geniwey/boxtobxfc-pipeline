@@ -1,4 +1,3 @@
-Inter de Milan
 Barcelona
 Brasil
 Juventus
@@ -8,3 +7,4 @@ Paris Saint-Germain
 Liverpool
 Chelsea
 Argentina
+Alemania
