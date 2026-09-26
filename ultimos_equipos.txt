@@ -1,4 +1,3 @@
-Leicester City
 Just Fontaine
 Inglaterra
 Juventus
@@ -8,3 +7,4 @@ Paris Saint-Germain
 Real Madrid
 Chelsea
 Bayern Munich
+Liverpool
