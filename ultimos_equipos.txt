@@ -1,4 +1,3 @@
-Barcelona
 Brasil
 Inglaterra
 Manchester City
@@ -8,3 +7,4 @@ Chelsea
 Real Madrid
 Liverpool
 Leicester City
+Paris Saint-Germain
