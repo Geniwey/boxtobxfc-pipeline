@@ -1,4 +1,3 @@
-Manchester City
 Atletico de Madrid
 Juventus
 Chelsea
@@ -8,3 +7,4 @@ Leicester City
 Paris Saint-Germain
 Argentina
 Brasil
+Hakan Sukur
