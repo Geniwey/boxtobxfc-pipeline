@@ -1,4 +1,3 @@
-Hakan Sukur
 Chelsea
 Real Madrid
 Juventus
@@ -8,3 +7,4 @@ Inter de Milan
 Bayern Munich
 Argentina
 Just Fontaine
+Leicester City
