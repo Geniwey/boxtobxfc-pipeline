@@ -1,4 +1,3 @@
-Chelsea
 Real Madrid
 Juventus
 Alemania
@@ -8,3 +7,4 @@ Bayern Munich
 Argentina
 Just Fontaine
 Leicester City
+Brasil
