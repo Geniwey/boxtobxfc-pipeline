@@ -1,4 +1,3 @@
-Bayern Munich
 Manchester City
 Barcelona
 Just Fontaine
@@ -8,3 +7,4 @@ Liverpool
 Atletico de Madrid
 Inglaterra
 Leicester City
+Brasil
