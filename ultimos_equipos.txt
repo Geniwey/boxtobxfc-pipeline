@@ -1,4 +1,3 @@
-Brasil
 Paris Saint-Germain
 Argentina
 Atletico de Madrid
@@ -8,3 +7,4 @@ Leicester City
 España
 Juventus
 Just Fontaine
+Chelsea
