@@ -1,4 +1,3 @@
-Juventus
 Just Fontaine
 Chelsea
 Inglaterra
@@ -8,3 +7,4 @@ Barcelona
 Alemania
 Brasil
 Argentina
+Atletico de Madrid
