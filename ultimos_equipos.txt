@@ -1,4 +1,3 @@
-Juventus
 Chelsea
 Hakan Sukur
 Liverpool
@@ -8,3 +7,4 @@ Real Madrid
 Paris Saint-Germain
 Bayern Munich
 Alemania
+España
