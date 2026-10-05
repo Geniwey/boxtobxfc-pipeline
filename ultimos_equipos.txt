@@ -1,4 +1,3 @@
-Manchester City
 Just Fontaine
 Leicester City
 Brasil
@@ -8,3 +7,4 @@ Inter de Milan
 Hakan Sukur
 Inglaterra
 Chelsea
+Liverpool
