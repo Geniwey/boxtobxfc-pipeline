@@ -1,4 +1,3 @@
-Just Fontaine
 Manchester City
 Brasil
 Just Fontaine
@@ -8,3 +7,4 @@ Inter de Milan
 Paris Saint-Germain
 Atletico de Madrid
 Argentina
+Barcelona
