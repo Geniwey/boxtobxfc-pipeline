@@ -1,4 +1,3 @@
-Paris Saint-Germain
 Juventus
 Hakan Sukur
 Just Fontaine
@@ -8,3 +7,4 @@ Bayern Munich
 Liverpool
 Inter de Milan
 Leicester City
+Just Fontaine
