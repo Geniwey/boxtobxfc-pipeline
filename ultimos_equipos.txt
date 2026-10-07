@@ -1,4 +1,3 @@
-Juventus
 Hakan Sukur
 Just Fontaine
 Manchester City
@@ -8,3 +7,4 @@ Liverpool
 Inter de Milan
 Leicester City
 Just Fontaine
+Chelsea
