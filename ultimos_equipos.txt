@@ -1,4 +1,3 @@
-Liverpool
 Barcelona
 Leicester City
 Alemania
@@ -8,3 +7,4 @@ Paris Saint-Germain
 Juventus
 Hakan Sukur
 Just Fontaine
+Manchester City
