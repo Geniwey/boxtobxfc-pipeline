@@ -1,4 +1,3 @@
-Argentina
 Just Fontaine
 Atletico de Madrid
 Real Madrid
@@ -8,3 +7,4 @@ Brasil
 Inglaterra
 Liverpool
 Chelsea
+Barcelona
