@@ -1,4 +1,3 @@
-Manchester City
 Barcelona
 Alemania
 Just Fontaine
@@ -8,3 +7,4 @@ Leicester City
 Bayern Munich
 Hakan Sukur
 España
+Inter de Milan
