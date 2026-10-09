@@ -1,4 +1,3 @@
-Atletico de Madrid
 Real Madrid
 Leicester City
 Bayern Munich
@@ -8,3 +7,4 @@ Liverpool
 Chelsea
 Barcelona
 Juventus
+Hakan Sukur
