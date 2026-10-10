@@ -1,4 +1,3 @@
-Juventus
 Hakan Sukur
 Inter de Milan
 Paris Saint-Germain
@@ -8,3 +7,4 @@ Atletico de Madrid
 Alemania
 Real Madrid
 Manchester City
+Bayern Munich
