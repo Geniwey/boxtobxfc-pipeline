@@ -1,4 +1,3 @@
-Liverpool
 Chelsea
 Barcelona
 Juventus
@@ -8,3 +7,4 @@ Paris Saint-Germain
 Leicester City
 España
 Atletico de Madrid
+Alemania
