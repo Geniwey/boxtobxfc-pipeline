@@ -1,4 +1,3 @@
-Liverpool
 Chelsea
 Barcelona
 Leicester City
@@ -8,3 +7,4 @@ Paris Saint-Germain
 Just Fontaine
 Alemania
 Manchester City
+Inter de Milan
