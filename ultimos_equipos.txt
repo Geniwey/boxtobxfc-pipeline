@@ -1,4 +1,3 @@
-Bayern Munich
 Brasil
 Inglaterra
 Liverpool
@@ -8,3 +7,4 @@ Juventus
 Hakan Sukur
 Inter de Milan
 Paris Saint-Germain
+Leicester City
