@@ -1,4 +1,3 @@
-Real Madrid
 Liverpool
 Just Fontaine
 Inter de Milan
@@ -8,3 +7,4 @@ Barcelona
 Juventus
 Bayern Munich
 Hakan Sukur
+Inglaterra
