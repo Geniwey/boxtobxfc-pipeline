@@ -1,4 +1,3 @@
-Bayern Munich
 Paris Saint-Germain
 Barcelona
 Argentina
@@ -8,3 +7,4 @@ Chelsea
 Brasil
 Real Madrid
 Liverpool
+Just Fontaine
