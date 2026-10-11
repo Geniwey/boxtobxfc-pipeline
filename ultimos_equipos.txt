@@ -1,4 +1,3 @@
-Manchester City
 Chelsea
 Brasil
 Real Madrid
@@ -8,3 +7,4 @@ Inter de Milan
 Paris Saint-Germain
 Leicester City
 Barcelona
+Juventus
