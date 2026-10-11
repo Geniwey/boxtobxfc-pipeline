@@ -1,4 +1,3 @@
-Real Madrid
 Juventus
 Liverpool
 Leicester City
@@ -8,3 +7,4 @@ Barcelona
 Argentina
 Hakan Sukur
 Manchester City
+Chelsea
