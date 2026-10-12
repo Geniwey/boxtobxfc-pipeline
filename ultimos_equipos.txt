@@ -1,4 +1,3 @@
-Brasil
 Atletico de Madrid
 Bayern Munich
 Leicester City
@@ -8,3 +7,4 @@ Paris Saint-Germain
 Alemania
 Argentina
 Barcelona
+Hakan Sukur
