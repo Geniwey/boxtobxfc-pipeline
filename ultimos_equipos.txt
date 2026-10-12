@@ -1,4 +1,3 @@
-Barcelona
 Juventus
 Bayern Munich
 Hakan Sukur
@@ -8,3 +7,4 @@ Brasil
 Real Madrid
 Just Fontaine
 Leicester City
+Chelsea
