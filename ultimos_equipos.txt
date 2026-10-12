@@ -1,4 +1,3 @@
-Barcelona
 Alemania
 España
 Hakan Sukur
@@ -8,3 +7,4 @@ Brasil
 Atletico de Madrid
 Bayern Munich
 Leicester City
+Manchester City
