@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v45.0 (RETENCIÓN PRO + AUDIO -17.5dB + YT FIX)
+# ⚽ BOX TO BOX FC - PIPELINE v46.0 (RETENCIÓN PRO + AUDIO -17.5dB + MEMORIA 28)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v45.0"
+name: "Box to Box FC - Pipeline v46.0"
 
 concurrency:
   group: render-b2b-unico
@@ -112,9 +112,9 @@ jobs:
           open('script_audio.txt','w',encoding='utf-8').write(script_audio)
           open('titulo_corto.txt','w',encoding='utf-8').write(titulo[:55])
 
-          # Gancho visual limpio (sin emojis que rompan Bebas Neue y con margen seguro)
+          # Gancho visual limpio con márgenes amplios para que no toque bordes
           hook_clean = re.sub(r'[^\w\s\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\%\:\-]', '', titulo).upper().strip()
-          wrapped = textwrap.fill(hook_clean, width=18, max_lines=3, placeholder='')
+          wrapped = textwrap.fill(hook_clean, width=16, max_lines=3, placeholder='')
           open('hook_text.txt','w',encoding='utf-8').write(wrapped or 'DEBATE TÁCTICO')
           print(f"✅ Título fijado: {titulo}")
           PYTHON_EXTRAER
@@ -145,10 +145,16 @@ jobs:
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
           cat << 'PYTHON_PEXELS' > /tmp/gen_pexels.py
-          import os, sys, random, requests, urllib.parse
+          import os, sys, json, random, requests, urllib.parse
           sys.stdout.reconfigure(encoding='utf-8')
 
-          queries_raw = os.environ.get('BUSQUEDA', '')
+          queries_raw = os.environ.get('BUSQUEDA', '').strip()
+          if not queries_raw and os.path.exists('payload.json'):
+              try:
+                  queries_raw = str(json.load(open('payload.json','r',encoding='utf-8')).get('busqueda_pexels',''))
+              except Exception:
+                  pass
+
           queries = [q.strip() for q in queries_raw.split(',') if q.strip()]
 
           backup_pool = [
@@ -156,6 +162,7 @@ jobs:
               "referee yellow card", "goalkeeper diving", "football stadium night",
               "soccer match action", "angry sport fan"
           ]
+          random.shuffle(backup_pool)
           for b in backup_pool:
               if len(queries) >= 8: break
               if b not in queries: queries.append(b)
@@ -222,7 +229,6 @@ jobs:
           if not downloaded_clips:
               os.system('ffmpeg -y -f lavfi -i "color=c=#0A0B10:s=1080x1920:d=15:r=30" -c:v libx264 -preset ultrafast pexels.mp4 2>/dev/null')
           else:
-              # Duplicamos secuencia barajada para cubrir hasta 60s sin cortes bruscos
               secuencia = downloaded_clips + random.sample(downloaded_clips, len(downloaded_clips))
               with open('concat_list.txt', 'w') as f:
                   for clip in secuencia:
@@ -268,7 +274,7 @@ jobs:
 
           impact_keywords = {
               'GOL','GOLES','RÉCORD','RECORD','HISTORIA','BRUTAL','CRISIS','FRACASO',
-              'MENTIRA','FRAUDE','CAMPEÓN','MUNDIAL','CHAMPIONS',' MILLONES','PORCIENTO',
+              'MENTIRA','FRAUDE','CAMPEÓN','MUNDIAL','CHAMPIONS','MILLONES','PORCIENTO',
               'NUNCA','NADIE','DESASTRE','COLAPSO','PELIGRO','ERROR','BANQUILLO'
           }
 
@@ -280,7 +286,7 @@ jobs:
               if w.get('word','').strip() and w.get('end',0) > w.get('start',0)
           ]
 
-          # BorderStyle 1 con Outline 8 y Shadow 4 + márgenes amplios (80px lateral, 340px vertical)
+          # BorderStyle 1 con Outline 9 y Shadow 4 + márgenes amplios (85px lateral, 360px vertical)
           header = f"""[Script Info]
           ScriptType: v4.00+
           WrapStyle: 0
@@ -290,7 +296,7 @@ jobs:
 
           [V4+ Styles]
           Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-          Style: Default,{font_name},104,&H00FFFFFF,&H00FFFFFF,&H00000000,&HAA000000,-1,0,0,0,100,100,1,0,1,8,4,2,80,80,340,1
+          Style: Default,{font_name},104,&H00FFFFFF,&H00FFFFFF,&H00000000,&HAA000000,-1,0,0,0,100,100,1,0,1,9,4,2,85,85,360,1
 
           [Events]
           Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -347,7 +353,7 @@ jobs:
 
           # Gancho inicial con caja semitransparente y márgenes seguros para que se lea sobre cualquier fondo
           ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i logo.png \
-            -filter_complex "[0:v]scale=1080:1920,setsar=1[bg];[2:v]scale=280:-1,colorchannelmixer=aa=0.90[logo];[bg][logo]overlay=40:60[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=82:fontcolor=0xFFD700:borderw=6:bordercolor=black:box=1:boxcolor=black@0.65:boxborderw=24:line_spacing=12:x=(w-text_w)/2:y=(h-text_h)/2-260:enable='lt(t\,2.0)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
+            -filter_complex "[0:v]scale=1080:1920,setsar=1[bg];[2:v]scale=280:-1,colorchannelmixer=aa=0.90[logo];[bg][logo]overlay=40:60[bg_logo];[bg_logo]drawtext=fontfile=${HOME}/.fonts/BebasNeue.ttf:textfile='${HOOK_ESC}':fontsize=80:fontcolor=0xFFD700:borderw=6:bordercolor=black:box=1:boxcolor=black@0.70:boxborderw=26:line_spacing=12:x=(w-text_w)/2:y=(h-text_h)/2-260:enable='lt(t\,2.0)'[hooked];[hooked]subtitles='${ASS_ESC}':fontsdir=~/.fonts[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.95:t=fill[outv]" \
             -map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -t "$DUR" -movflags +faststart output.mp4
 
       - name: "📺 Publicar en YouTube (Rotación Real de 4 Cuentas)"
@@ -438,7 +444,6 @@ jobs:
               except HttpError as e:
                   err_txt = e.content.decode('utf-8', errors='ignore')
                   print(f"❌ HttpError en Credencial #{idx}: {err_txt[:250]}")
-                  # Continuamos con la siguiente credencial en vez de abortar
                   continue
               except Exception as e:
                   print(f"❌ Error general en Credencial #{idx}: {e}")
@@ -456,7 +461,7 @@ jobs:
             exit 1
           fi
 
-      - name: "🧠 Actualizar memoria"
+      - name: "🧠 Actualizar memoria (Últimos 28 vídeos sin repetir)"
         if: success()
         env:
           EQUIPO_USADO: ${{ github.event.client_payload.equipo_usado }}
@@ -465,7 +470,7 @@ jobs:
             touch ultimos_equipos.txt
             IFS=',' read -ra EQUIPOS_ARR <<< "$EQUIPO_USADO"
             for eq in "${EQUIPOS_ARR[@]}"; do echo "$eq" >> ultimos_equipos.txt; done
-            tail -n 14 ultimos_equipos.txt > ultimos_equipos_tmp.txt
+            tail -n 28 ultimos_equipos.txt > ultimos_equipos_tmp.txt
             mv ultimos_equipos_tmp.txt ultimos_equipos.txt
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
