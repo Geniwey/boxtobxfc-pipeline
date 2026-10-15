@@ -1,4 +1,3 @@
-Arsenal
 Tottenham
 Uruguay
 Bayer Leverkusen 2023-24
@@ -26,3 +25,4 @@ Francia
 Portugal
 Paris Saint-Germain
 Manchester City
+FC Porto en 2004
