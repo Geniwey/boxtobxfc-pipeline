@@ -1,4 +1,3 @@
-Bayer Leverkusen 2023-24
 Borussia Dortmund
 Newcastle United
 Real Madrid en 2022
@@ -26,3 +25,4 @@ Manchester City
 FC Porto en 2004
 Napoli
 Inter de Milan
+Tottenham
