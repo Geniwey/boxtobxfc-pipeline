@@ -1,4 +1,3 @@
-Tottenham
 Uruguay
 Bayer Leverkusen 2023-24
 Borussia Dortmund
@@ -26,3 +25,4 @@ Portugal
 Paris Saint-Germain
 Manchester City
 FC Porto en 2004
+Napoli
