@@ -1,4 +1,3 @@
-Napoli
 Inter de Milan
 Tottenham
 Leicester City en 2016
@@ -26,3 +25,4 @@ AC Milan de los 90
 Alemania en 2014
 Alemania
 Manchester City
+FC Porto en 2004
