@@ -1,4 +1,3 @@
-Argentina
 Barcelona
 Dinamarca en 1992
 Atletico de Madrid
@@ -26,3 +25,4 @@ Italia
 Chelsea
 España
 Manchester United
+Bayern Munich
