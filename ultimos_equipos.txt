@@ -1,4 +1,3 @@
-Real Madrid
 Rogerio Ceni
 Aston Villa
 AS Roma
@@ -26,3 +25,4 @@ Países Bajos
 Inglaterra
 Liverpool
 Newcastle United
+Borussia Dortmund
