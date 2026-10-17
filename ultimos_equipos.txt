@@ -1,4 +1,3 @@
-Inglaterra
 Liverpool
 Newcastle United
 Borussia Dortmund
@@ -26,3 +25,4 @@ Paris Saint-Germain
 Napoli
 Argentina
 Chelsea 2004-05
+Países Bajos
