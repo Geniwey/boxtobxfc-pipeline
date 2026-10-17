@@ -1,4 +1,3 @@
-Borussia Dortmund
 Arsenal
 Juventus
 Bayer Leverkusen
@@ -26,3 +25,4 @@ Chelsea 2004-05
 Países Bajos
 AC Milan
 Just Fontaine
+Uruguay
