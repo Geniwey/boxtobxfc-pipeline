@@ -1,4 +1,3 @@
-Arsenal
 Juventus
 Bayer Leverkusen
 Brasil
@@ -26,3 +25,4 @@ Países Bajos
 AC Milan
 Just Fontaine
 Uruguay
+Dinamarca en 1992
