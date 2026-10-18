@@ -1,4 +1,3 @@
-Inter de Milan
 Italia
 España
 Bayern Munich
@@ -26,3 +25,4 @@ Francia
 Arsenal de los Invencibles
 Leicester City en 2016
 Newcastle United
+Uruguay
