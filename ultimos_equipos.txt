@@ -1,4 +1,3 @@
-AC Milan
 Just Fontaine
 Uruguay
 Dinamarca en 1992
@@ -26,3 +25,4 @@ Barcelona
 Arsenal
 Argentina
 Alemania en 2014
+Grecia en 2004
