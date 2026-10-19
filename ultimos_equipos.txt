@@ -1,4 +1,3 @@
-Barcelona
 Arsenal
 Argentina
 Alemania en 2014
@@ -26,3 +25,4 @@ Dinamarca en 1992
 Chelsea
 Real Madrid
 Italia
+Manchester City
