@@ -1,4 +1,3 @@
-Manchester United
 Barcelona
 Arsenal
 Argentina
@@ -26,3 +25,4 @@ Brasil
 Dinamarca en 1992
 Chelsea
 Real Madrid
+Italia
