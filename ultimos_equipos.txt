@@ -1,4 +1,3 @@
-Real Madrid
 Chelsea
 Aston Villa
 Inglaterra
@@ -26,3 +25,4 @@ Liverpool
 AC Milan
 Atletico de Madrid
 Kaiserslautern en 1998
+Brasil
