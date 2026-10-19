@@ -1,4 +1,3 @@
-Aston Villa
 Inglaterra
 Manchester United
 Barcelona
@@ -26,3 +25,4 @@ Atletico de Madrid
 Kaiserslautern en 1998
 Brasil
 Dinamarca en 1992
+Chelsea
