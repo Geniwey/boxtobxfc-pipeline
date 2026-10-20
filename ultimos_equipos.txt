@@ -1,4 +1,3 @@
-Barcelona
 Nottingham Forest
 Tottenham
 Rogerio Ceni
@@ -26,3 +25,4 @@ Hakan Sukur
 Dinamarca en 1992
 Inter de Milan
 Chelsea
+Liverpool
