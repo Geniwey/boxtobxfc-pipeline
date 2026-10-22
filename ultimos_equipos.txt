@@ -1,4 +1,3 @@
-AC Milan de los 90
 Italia
 Rogerio Ceni
 España
@@ -26,3 +25,4 @@ Manchester United
 Kaiserslautern en 1998
 Argentina
 Real Madrid
+Uruguay
