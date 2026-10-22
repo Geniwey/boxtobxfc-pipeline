@@ -1,4 +1,3 @@
-Nottingham Forest
 Tottenham
 Chelsea 2004-05
 Borussia Dortmund
@@ -26,3 +25,4 @@ Italia
 Chelsea
 Newcastle United
 Bayer Leverkusen
+Real Madrid en 2022
