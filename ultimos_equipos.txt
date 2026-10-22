@@ -1,4 +1,3 @@
-Brasil
 Paris Saint-Germain
 Nottingham Forest
 Tottenham
@@ -26,3 +25,4 @@ Uruguay
 Juventus
 Italia
 Chelsea
+Newcastle United
