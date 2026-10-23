@@ -1,4 +1,3 @@
-Italia
 Chelsea
 Newcastle United
 Bayer Leverkusen
@@ -26,3 +25,4 @@ Manchester United
 Portugal
 FC Porto en 2004
 Borussia Dortmund
+Francia
