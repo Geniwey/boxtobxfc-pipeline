@@ -1,4 +1,3 @@
-Juventus
 Italia
 Chelsea
 Newcastle United
@@ -26,3 +25,4 @@ Dinamarca en 1992
 Manchester United
 Portugal
 FC Porto en 2004
+Borussia Dortmund
