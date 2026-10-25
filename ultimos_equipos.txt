@@ -1,4 +1,3 @@
-Bayern Munich
 Argentina
 Chelsea
 Aston Villa
@@ -26,3 +25,4 @@ Barcelona
 Real Madrid
 Arsenal
 AC Milan
+Nottingham Forest
