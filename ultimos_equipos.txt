@@ -1,4 +1,3 @@
-Rogerio Ceni
 Nottingham Forest
 Bayern Munich
 Argentina
@@ -26,3 +25,4 @@ Leicester City en 2016
 Paris Saint-Germain
 Barcelona
 Real Madrid
+Arsenal
