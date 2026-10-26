@@ -1,4 +1,3 @@
-Borussia Dortmund
 Newcastle United
 Tottenham
 Lionel Messi en 2012
@@ -26,3 +25,4 @@ Bayer Leverkusen 2023-24
 FC Porto en 2004
 Países Bajos
 Real Madrid
+Barcelona
