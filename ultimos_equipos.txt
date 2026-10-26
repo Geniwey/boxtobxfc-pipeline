@@ -1,4 +1,3 @@
-Real Madrid
 Arsenal
 AC Milan
 Nottingham Forest
@@ -26,3 +25,4 @@ Francia
 Liverpool
 Bayer Leverkusen
 Paris Saint-Germain
+Inter de Milan
