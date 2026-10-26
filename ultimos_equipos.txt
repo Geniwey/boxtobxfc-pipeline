@@ -1,4 +1,3 @@
-Barcelona
 Real Madrid
 Arsenal
 AC Milan
@@ -26,3 +25,4 @@ Alemania en 2014
 Francia
 Liverpool
 Bayer Leverkusen
+Paris Saint-Germain
