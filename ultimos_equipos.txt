@@ -1,4 +1,3 @@
-Arsenal
 AC Milan
 Nottingham Forest
 Bayern Munich
@@ -26,3 +25,4 @@ Liverpool
 Bayer Leverkusen
 Paris Saint-Germain
 Inter de Milan
+Bayer Leverkusen 2023-24
