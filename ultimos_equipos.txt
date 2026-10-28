@@ -1,4 +1,3 @@
-Real Madrid
 Barcelona
 Borussia Dortmund
 AS Roma
@@ -26,3 +25,4 @@ Alemania
 Uruguay
 Dinamarca en 1992
 AC Milan de los 90
+Países Bajos
