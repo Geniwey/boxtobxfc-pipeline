@@ -1,4 +1,3 @@
-AS Roma
 Bayern Munich
 Just Fontaine
 Leicester City en 2016
@@ -26,3 +25,4 @@ Aston Villa
 Real Madrid en 2022
 Juventus
 Manchester City
+Bayer Leverkusen
