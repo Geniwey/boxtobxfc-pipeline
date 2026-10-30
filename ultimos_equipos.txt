@@ -1,4 +1,3 @@
-Tottenham
 Arsenal
 Chelsea 2004-05
 Chelsea
@@ -26,3 +25,4 @@ Francia
 Brasil
 AS Roma
 Newcastle United
+Napoli
