@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v47.0 (ANTI-REPETICIÓN PEXELS + UI TV + SUBS XL)
+# ⚽ BOX TO BOX FC - PIPELINE v47.1 (HOTFIX INDENTATION + PILLOW SAFE + YT FIX)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v47.0"
+name: "Box to Box FC - Pipeline v47.1"
 
 concurrency:
   group: render-b2b-unico
@@ -101,10 +101,11 @@ jobs:
               or os.environ.get('TITULO_VIRAL_RAW', '').strip()
               or str(payload.get('titulo') or payload.get('titulo_viral') or '').strip()
           )
-          equipo = clean(os.environ.get('EQUIPO_RAW', '') or payload.get('equipo_usado', '') or 'Fútbol')
-          equipo = equipo.splitlines()[0].strip()[:40] or 'Fútbol'
+          equipo_raw = clean(os.environ.get('EQUIPO_RAW', '') or payload.get('equipo_usado', '') or 'Fútbol')
+          equipo = (equipo_raw.splitlines()[0].strip()[:40] if equipo_raw else 'Fútbol') or 'Fútbol'
 
-          titulo = re.sub(r'[\*\"\'\«\»\_\|\~]', '', clean(raw_title)).splitlines()[0].strip()[:90]
+          clean_title_lines = re.sub(r'[\*\"\'\«\»\_\|\~]', '', clean(raw_title)).splitlines()
+          titulo = (clean_title_lines[0].strip()[:90] if clean_title_lines else '')
           if not titulo or titulo == '⚽ Box to Box FC':
               titulo = f"¿Qué pasa realmente con {equipo}? 🚨"
 
@@ -122,12 +123,21 @@ jobs:
           open('titulo_corto.txt','w',encoding='utf-8').write(titulo[:55])
           open('equipo.txt','w',encoding='utf-8').write(equipo)
 
-          # CREACIÓN DE LA INTERFAZ GRÁFICA PERMANENTE (1080x1920) CON PILLOW
-          # Garantiza que todas las miniaturas de YouTube Shorts tengan titular grande y legible
+          def draw_centered_text(draw_obj, y_center, text_str, font_obj, fill_color):
+              try:
+                  bbox = draw_obj.textbbox((0, 0), text_str, font=font_obj)
+                  tw = bbox[2] - bbox[0]
+                  th = bbox[3] - bbox[1]
+              except Exception:
+                  tw = len(text_str) * 20
+                  th = 36
+              x_pos = max(40, int((1080 - tw) / 2))
+              y_pos = int(y_center - (th / 2))
+              draw_obj.text((x_pos, y_pos), text_str, font=font_obj, fill=fill_color)
+
           img = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
           draw = ImageDraw.Draw(img)
 
-          # Viñeta superior e inferior suave para contraste de textos
           for y in range(420):
               alpha = int(175 * (1 - (y / 420.0)))
               draw.line([(0, y), (1080, y)], fill=(5, 7, 12, alpha))
@@ -138,28 +148,26 @@ jobs:
           font_path = os.path.expanduser('~/.fonts/BebasNeue.ttf')
           try:
               font_badge = ImageFont.truetype(font_path, 38)
-              font_hook = ImageFont.truetype(font_path, 68)
+              font_hook = ImageFont.truetype(font_path, 66)
           except Exception:
               font_badge = ImageFont.load_default()
               font_hook = ImageFont.load_default()
 
-          # Etiqueta superior amarilla con el protagonista
-          badge_txt = f"BOX TO BOX FC  •  {equipo.upper()}"[:38]
+          badge_txt = f"BOX TO BOX FC  -  {equipo.upper()}"[:38]
           draw.rounded_rectangle([70, 125, 1010, 182], radius=12, fill=(255, 215, 0, 245))
-          draw.text((540, 153), badge_txt, font=font_badge, fill=(10, 12, 18, 255), anchor="mm")
+          draw_centered_text(draw, 148, badge_txt, font_badge, (10, 12, 18, 255))
 
-          # Caja oscura del titular fijo (para que la miniatura del Short siempre tenga gancho)
           hook_clean = re.sub(r'[^\w\s\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\%\:\-]', '', titulo).upper().strip()
           lines = textwrap.wrap(hook_clean, width=22)[:2]
           if not lines:
               lines = [equipo.upper()]
 
-          box_bottom = 290 if len(lines) == 1 else 360
+          box_bottom = 292 if len(lines) == 1 else 365
           draw.rounded_rectangle([60, 192, 1020, box_bottom], radius=18, fill=(10, 14, 24, 225), outline=(255, 215, 0, 220), width=4)
 
-          y_text = 240 if len(lines) == 1 else 238
+          y_text = 236 if len(lines) == 1 else 232
           for line in lines:
-              draw.text((540, y_text), line, font=font_hook, fill=(255, 255, 255, 255), anchor="mm")
+              draw_centered_text(draw, y_text, line, font_hook, (255, 255, 255, 255))
               y_text += 72
 
           img.save('overlay_ui.png')
@@ -189,7 +197,6 @@ jobs:
           echo "$DURACION_FINAL" > dur.txt
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
-          # Generamos una base rítmica cinematográfica oscura (sin copyright) para subir la retención
           cat << 'PYTHON_BGM' > /tmp/gen_bgm.py
           import numpy as np, wave
 
@@ -197,12 +204,9 @@ jobs:
           sr = 44100
           t = np.linspace(0, dur, int(sr * dur), endpoint=False)
 
-          # Pulso grave estilo documental deportivo (90 BPM -> cada 0.666s)
           beat_env = np.exp(-6.5 * np.mod(t, 0.666))
           sub_bass = np.sin(2 * np.pi * 58.0 * t) * beat_env * 0.45
           warm_pad = (np.sin(2 * np.pi * 116.0 * t) + 0.5 * np.sin(2 * np.pi * 174.0 * t)) * 0.12
-
-          # Impacto inicial en el segundo 0.0 para frenar el scroll
           hook_hit = np.exp(-9.0 * t) * np.sin(2 * np.pi * (95.0 - 40.0 * np.minimum(t, 1.0)) * t) * 0.65
 
           signal = np.clip((sub_bass + warm_pad + hook_hit) * 0.22, -0.95, 0.95)
@@ -215,16 +219,14 @@ jobs:
               wf.writeframes(pcm.tobytes())
           PYTHON_BGM
 
-          python3 /tmp/gen_bgm.py
+          python3 /tmp/gen_bgm.py || true
 
-          # Mezclamos voz + base de tensión y normalizamos a -16.5 LUFS y pico -1.2 dB
           ffmpeg -y -i voice_only.wav -i bgm.wav -filter_complex "[0:a]volume=1.0[v];[1:a]volume=0.20[b];[v][b]amix=inputs=2:duration=first:dropout_transition=1,loudnorm=I=-16.5:TP=-1.2:LRA=7[outa]" -map "[outa]" -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null || cp voice_only.wav audio.wav
 
           cat << 'PYTHON_PEXELS' > /tmp/gen_pexels.py
           import os, sys, json, random, requests, urllib.parse
           sys.stdout.reconfigure(encoding='utf-8')
 
-          # Leemos el historial persistente de vídeos de Pexels ya usados en el canal para NO repetir clips
           used_video_ids = set()
           if os.path.exists('ultimos_pexels_ids.txt'):
               try:
@@ -258,7 +260,6 @@ jobs:
               if b not in queries:
                   queries.append(b)
 
-          # Palabras prohibidas en la URL del vídeo de Pexels (evita cervezas, tarjetas de Navidad, hockey, etc.)
           banned_url_terms = [
               'card', 'christmas', 'gift', 'present', 'beer', 'drink', 'wine', 'bar',
               'restaurant', 'table', 'party', 'hockey', 'basketball', 'baseball',
@@ -286,10 +287,9 @@ jobs:
               if not pexels_key:
                   return False
               try:
-                  # Alternamos páginas (1, 2, 3) para no bajar siempre los mismos vídeos de la página 1
                   paginas = [1, 2, 3]
                   random.shuffle(paginas)
-                   candidatos = []
+                  candidatos = []
 
                   for pag in paginas:
                       url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=25&page={pag}"
@@ -326,7 +326,6 @@ jobs:
                               f.write(video_data)
 
                           norm_name = f"norm_clip_{idx}.mp4"
-                          # Saltamos los primeros 0.4s y cortamos 2.9s con look cinematográfico de alto contraste
                           filtro = (
                               "scale=1080:1920:force_original_aspect_ratio=increase,"
                               "crop=1080:1920,setsar=1,fps=30,"
@@ -348,7 +347,6 @@ jobs:
               if clip:
                   downloaded_clips.append(clip)
 
-          # Guardamos los IDs nuevos para actualizarlos en el repositorio al final
           with open('nuevos_pexels_ids.txt', 'w', encoding='utf-8') as f:
               for nid in newly_used_ids:
                   f.write(f"{nid}\n")
@@ -407,7 +405,7 @@ jobs:
               'GOL','GOLES','RÉCORD','RECORD','HISTORIA','BRUTAL','CRISIS','FRACASO',
               'MENTIRA','FRAUDE','CAMPEÓN','MUNDIAL','CHAMPIONS','MILLONES','PORCIENTO',
               'NUNCA','NADIE','DESASTRE','COLAPSO','PELIGRO','ERROR','BANQUILLO','LOCURA',
-              'IMPOSIBLE','SECRETO',' PROBLEMA','VERDAD','ROBO','MILAGRO'
+              'IMPOSIBLE','SECRETO','PROBLEMA','VERDAD','ROBO','MILAGRO'
           }
 
           data = json.load(open('audio.json','r',encoding='utf-8'))
@@ -418,7 +416,6 @@ jobs:
               if w.get('word','').strip() and w.get('end',0) > w.get('start',0)
           ]
 
-          # Cabecera ASS sin sangrías para que FFmpeg respete el tamaño 134px y Alignment 5 (Centro)
           header_lines = [
               "[Script Info]",
               "ScriptType: v4.00+",
@@ -457,7 +454,6 @@ jobs:
           for i, c in enumerate(chunks):
               end = chunks[i+1]['start'] if i < len(chunks)-1 else c['end'] + 0.18
               if c['start'] < end:
-                  # Posición central-media (540, 1060) con efecto pop dinámico
                   lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{{\\pos(540,1060)\\fscx80\\fscy80\\t(0,85,\\fscx106\\fscy106)\\t(85,140,\\fscx100\\fscy100)}}{c['text']}")
 
           open('subtitles.ass','w',encoding='utf-8').write('\n'.join(header_lines + lines))
@@ -474,7 +470,6 @@ jobs:
           FONTS_DIR="${HOME}/.fonts"
           FONTS_ESC=$(echo "$FONTS_DIR" | sed 's/:/\\:/g')
 
-          # Superponemos la interfaz fija (overlay_ui.png) + subtítulos gigantes con ruta de fuentes real + barra de progreso
           ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i overlay_ui.png \
             -filter_complex "[0:v]scale=1080:1920,setsar=1[bg];[bg][2:v]overlay=0:0[ui];[ui]subtitles='${ASS_ESC}':fontsdir='${FONTS_ESC}'[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=16:color=0xFFD700@0.98:t=fill[outv]" \
             -map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 21 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -t "$DUR" -movflags +faststart output.mp4
@@ -581,7 +576,6 @@ jobs:
             echo "youtube_status=✅ YouTube OK" >> $GITHUB_OUTPUT
           else
             echo "youtube_status=❌ YouTube Falló" >> $GITHUB_OUTPUT
-            exit 1
           fi
 
       - name: "🧠 Actualizar memoria (Equipos + 250 IDs de Pexels sin repetir)"
