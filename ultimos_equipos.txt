@@ -1,4 +1,3 @@
-Paris Saint-Germain
 Rogerio Ceni
 Atletico de Madrid
 Barcelona
@@ -30,3 +29,4 @@ Uruguay
 Real Madrid
 Argentina
 Inter de Milan
+Nottingham Forest
