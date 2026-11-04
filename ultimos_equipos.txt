@@ -1,4 +1,3 @@
-Just Fontaine
 Francia
 AC Milan
 Newcastle United
@@ -30,3 +29,4 @@ Chelsea
 Hakan Sukur
 Grecia en 2004
 Juventus
+Inglaterra
