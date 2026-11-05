@@ -1,4 +1,3 @@
-Bayer Leverkusen 2023-24
 Uruguay
 España
 Manchester United
@@ -30,3 +29,4 @@ Newcastle United
 Italia
 AS Roma
 Barcelona
+Inter de Milan
