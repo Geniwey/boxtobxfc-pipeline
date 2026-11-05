@@ -1,4 +1,3 @@
-Bayer Leverkusen
 Bayer Leverkusen 2023-24
 Uruguay
 España
@@ -30,3 +29,4 @@ Rogerio Ceni
 Newcastle United
 Italia
 AS Roma
+Barcelona
