@@ -1,4 +1,3 @@
-Aston Villa
 Brasil
 Arsenal
 Chelsea
@@ -30,3 +29,4 @@ Chelsea 2004-05
 Nottingham Forest
 Napoli
 España
+Dinamarca en 1992
