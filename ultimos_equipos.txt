@@ -1,4 +1,3 @@
-Brasil
 Arsenal
 Chelsea
 Hakan Sukur
@@ -30,3 +29,4 @@ Nottingham Forest
 Napoli
 España
 Dinamarca en 1992
+Manchester United
