@@ -1,4 +1,3 @@
-AS Roma
 Barcelona
 Inter de Milan
 AC Milan
@@ -30,3 +29,4 @@ Liverpool
 Inglaterra
 Sadio Mané en 2015
 Chelsea
+Juventus
