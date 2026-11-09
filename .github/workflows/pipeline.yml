@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v47.1 (HOTFIX INDENTATION + PILLOW SAFE + YT FIX)
+# ⚽ BOX TO BOX FC - PIPELINE v48.0 (AUDITORÍA PRO + CALLOUTS FLOTANTES + 1.8s)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v47.1"
+name: "Box to Box FC - Pipeline v48.0"
 
 concurrency:
   group: render-b2b-unico
@@ -58,7 +58,7 @@ jobs:
           python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
-      - name: "📝 Extraer textos y crear Tarjeta TV Permanente (Miniatura y Retención)"
+      - name: "📝 Extraer textos + Cabecera Complementaria + Callouts Flotantes"
         id: extraer
         timeout-minutes: 3
         env:
@@ -67,13 +67,14 @@ jobs:
           DESCRIPCION_RAW: ${{ github.event.client_payload.descripcion }}
           SCRIPT_RAW: ${{ github.event.client_payload.script_text }}
           EQUIPO_RAW: ${{ github.event.client_payload.equipo_usado }}
+          BUSQUEDA_RAW: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           cat << 'EOF' > payload.json
           ${{ toJson(github.event.client_payload) }}
           EOF
 
           cat << 'PYTHON_EXTRAER' > /tmp/extraer.py
-          import os, sys, re, json, textwrap
+          import os, sys, re, json
           from PIL import Image, ImageDraw, ImageFont
           sys.stdout.reconfigure(encoding='utf-8')
 
@@ -89,11 +90,11 @@ jobs:
               for c in ['\u200b','\u200c','\u200d','\u200e','\u200f','\u2060','\u00ad']:
                   t = t.replace(c, '')
               t = t.replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')
-              t = re.sub(r'\[(TITULO|TITULO_VIRAL|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
+              t = re.sub(r'\[(TITULO|TITULO_VIRAL|HOOK|DATO_\d|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
               return re.sub(r' {2,}', ' ', re.sub(r'\n{3,}', '\n\n', t)).strip()
 
           def sanitize_tts(t):
-              t = re.sub(r'\[(TITULO|TITULO_VIRAL|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
+              t = re.sub(r'\[(TITULO|TITULO_VIRAL|HOOK|DATO_\d|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
               return re.sub(r'[^\w\s\.,;:\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\%\-]', '', re.sub(r'[\*\"\'\«\»\(\)\[\]\{\}\#\_\|\~]', '', t)).strip()
 
           raw_title = (
@@ -102,20 +103,31 @@ jobs:
               or str(payload.get('titulo') or payload.get('titulo_viral') or '').strip()
           )
           equipo_raw = clean(os.environ.get('EQUIPO_RAW', '') or payload.get('equipo_usado', '') or 'Fútbol')
-          equipo = (equipo_raw.splitlines()[0].strip()[:40] if equipo_raw else 'Fútbol') or 'Fútbol'
+          equipo = (equipo_raw.splitlines()[0].strip()[:36] if equipo_raw else 'Fútbol') or 'Fútbol'
 
           clean_title_lines = re.sub(r'[\*\"\'\«\»\_\|\~]', '', clean(raw_title)).splitlines()
           titulo = (clean_title_lines[0].strip()[:90] if clean_title_lines else '')
           if not titulo or titulo == '⚽ Box to Box FC':
-              titulo = f"¿Qué pasa realmente con {equipo}? 🚨"
+              titulo = f"El dato de {equipo} que nadie cuenta 🚨"
 
           raw_desc = os.environ.get('DESCRIPCION_RAW', '').strip() or str(payload.get('descripcion') or '').strip()
-          descripcion = clean(raw_desc)[:4900] or f"Debate futbolero sobre {equipo}. #Futbol #Shorts #BoxToBoxFC"
+          descripcion = clean(raw_desc)[:4900] or f"¿Qué opinas sobre {equipo}? Te leo abajo 👇 #Futbol #Shorts #BoxToBoxFC"
 
           raw_script = os.environ.get('SCRIPT_RAW', '').strip() or str(payload.get('script_text') or '').strip()
           script_text = clean(raw_script)[:4900] or 'Déjame tu opinión en los comentarios.'
           script_audio = sanitize_tts(script_text)
 
+          # Desempaquetamos búsqueda_pexels||HOOK||DATO1|DATO2|DATO3
+          busqueda_full = os.environ.get('BUSQUEDA_RAW', '').strip() or str(payload.get('busqueda_pexels') or '').strip()
+          parts = busqueda_full.split('||')
+          pexels_only = parts[0].strip() if len(parts) > 0 else ''
+          hook_complementario = parts[1].strip() if len(parts) > 1 and parts[1].strip() else 'DATO CLAVE'
+          callouts_raw = parts[2].strip().split('|') if len(parts) > 2 and parts[2].strip() else []
+
+          while len(callouts_raw) < 3:
+              callouts_raw.append(equipo.upper()[:18])
+
+          open('pexels_queries.txt','w',encoding='utf-8').write(pexels_only)
           open('titulo.txt','w',encoding='utf-8').write(titulo)
           open('descripcion.txt','w',encoding='utf-8').write(descripcion)
           open('script.txt','w',encoding='utf-8').write(script_text)
@@ -123,80 +135,100 @@ jobs:
           open('titulo_corto.txt','w',encoding='utf-8').write(titulo[:55])
           open('equipo.txt','w',encoding='utf-8').write(equipo)
 
-          def draw_centered_text(draw_obj, y_center, text_str, font_obj, fill_color):
-              try:
-                  bbox = draw_obj.textbbox((0, 0), text_str, font=font_obj)
-                  tw = bbox[2] - bbox[0]
-                  th = bbox[3] - bbox[1]
-              except Exception:
-                  tw = len(text_str) * 20
-                  th = 36
-              x_pos = max(40, int((1080 - tw) / 2))
-              y_pos = int(y_center - (th / 2))
-              draw_obj.text((x_pos, y_pos), text_str, font=font_obj, fill=fill_color)
-
-          img = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
-          draw = ImageDraw.Draw(img)
-
-          for y in range(420):
-              alpha = int(175 * (1 - (y / 420.0)))
-              draw.line([(0, y), (1080, y)], fill=(5, 7, 12, alpha))
-          for y in range(1350, 1920):
-              alpha = int(190 * ((y - 1350) / 570.0))
-              draw.line([(0, y), (1080, y)], fill=(5, 7, 12, alpha))
-
           font_path = os.path.expanduser('~/.fonts/BebasNeue.ttf')
           try:
-              font_badge = ImageFont.truetype(font_path, 38)
-              font_hook = ImageFont.truetype(font_path, 66)
+              font_sm = ImageFont.truetype(font_path, 34)
+              font_md = ImageFont.truetype(font_path, 52)
+              font_lg = ImageFont.truetype(font_path, 58)
           except Exception:
-              font_badge = ImageFont.load_default()
-              font_hook = ImageFont.load_default()
+              font_sm = ImageFont.load_default()
+              font_md = ImageFont.load_default()
+              font_lg = ImageFont.load_default()
 
-          badge_txt = f"BOX TO BOX FC  -  {equipo.upper()}"[:38]
-          draw.rounded_rectangle([70, 125, 1010, 182], radius=12, fill=(255, 215, 0, 245))
-          draw_centered_text(draw, 148, badge_txt, font_badge, (10, 12, 18, 255))
+          def draw_centered(draw_obj, x_center, y_center, txt, fnt, color):
+              try:
+                  bb = draw_obj.textbbox((0, 0), txt, font=fnt)
+                  w, h = bb[2] - bb[0], bb[3] - bb[1]
+              except Exception:
+                  w, h = len(txt) * 18, 34
+              draw_obj.text((int(x_center - w / 2), int(y_center - h / 2 - 4)), txt, font=fnt, fill=color)
 
-          hook_clean = re.sub(r'[^\w\s\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\%\:\-]', '', titulo).upper().strip()
-          lines = textwrap.wrap(hook_clean, width=22)[:2]
-          if not lines:
-              lines = [equipo.upper()]
+          # 1. CABECERA COMPACTA ESTILO MARCADOR TV (Regla de Complementariedad: no repite el título y deja libre el centro)
+          ui = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+          d_ui = ImageDraw.Draw(ui)
+          for y in range(280):
+              a = int(160 * (1 - y / 280.0))
+              d_ui.line([(0, y), (1080, y)], fill=(5, 7, 12, a))
+          for y in range(1450, 1920):
+              a = int(185 * ((y - 1450) / 470.0))
+              d_ui.line([(0, y), (1080, y)], fill=(5, 7, 12, a))
 
-          box_bottom = 292 if len(lines) == 1 else 365
-          draw.rounded_rectangle([60, 192, 1020, box_bottom], radius=18, fill=(10, 14, 24, 225), outline=(255, 215, 0, 220), width=4)
+          # Marcador superior izquierdo (Protagonista) + derecho (Hook Complementario de 3 palabras)
+          d_ui.rounded_rectangle([65, 115, 535, 195], radius=14, fill=(255, 215, 0, 245))
+          draw_centered(d_ui, 300, 155, equipo.upper()[:20], font_md, (10, 12, 18, 255))
 
-          y_text = 236 if len(lines) == 1 else 232
-          for line in lines:
-              draw_centered_text(draw, y_text, line, font_hook, (255, 255, 255, 255))
-              y_text += 72
+          d_ui.rounded_rectangle([545, 115, 1015, 195], radius=14, fill=(12, 16, 26, 235), outline=(255, 215, 0, 230), width=3)
+          draw_centered(d_ui, 780, 155, hook_complementario.upper()[:20], font_md, (255, 255, 255, 255))
+          ui.save('overlay_ui.png')
 
-          img.save('overlay_ui.png')
-          print(f"✅ Interfaz y título generados: {titulo}")
+          # 2. GENERADOR DE ETIQUETAS FLOTANTES CON PUNTERO (ESTILO VÍDEO DEL LAVAVAJILLAS)
+          def crear_callout(filename, texto, box_x, box_y, target_x, target_y, accent_rgb):
+              im = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+              dr = ImageDraw.Draw(im)
+              box_w, box_h = 460, 96
+              cx = box_x + box_w // 2
+              cy = box_y + box_h // 2
+
+              # Línea indicadora y punto de radar (Target)
+              dr.line([(cx, cy), (target_x, target_y)], fill=(255, 255, 255, 230), width=5)
+              dr.ellipse([target_x - 22, target_y - 22, target_x + 22, target_y + 22], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 95), outline=(255, 255, 255, 240), width=3)
+              dr.ellipse([target_x - 9, target_y - 9, target_x + 9, target_y + 9], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 255))
+
+              # Píldora oscura con borde neón
+              dr.rounded_rectangle([box_x, box_y, box_x + box_w, box_y + box_h], radius=22, fill=(10, 14, 22, 238), outline=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 255), width=4)
+              dr.ellipse([box_x + 22, cy - 10, box_x + 42, cy + 10], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 255))
+              draw_centered(dr, cx + 14, cy, texto.upper()[:22], font_lg, (255, 255, 255, 255))
+              im.save(filename)
+
+          crear_callout('callout_1.png', callouts_raw[0], 70, 360, 620, 620, (255, 215, 0))
+          crear_callout('callout_2.png', callouts_raw[1], 550, 420, 430, 680, (0, 255, 140))
+          crear_callout('callout_3.png', callouts_raw[2], 80, 460, 640, 700, (0, 210, 255))
+
+          # 3. TARJETA FINAL DE INTERACCIÓN Y DEBATE (Últimos 3 segundos)
+          cta = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+          d_cta = ImageDraw.Draw(cta)
+          d_cta.rounded_rectangle([140, 1340, 940, 1445], radius=26, fill=(255, 215, 0, 248), outline=(255, 255, 255, 255), width=4)
+          draw_centered(d_cta, 540, 1392, "DEBATE EN COMENTARIOS  •  TE LEO ABAJO", font_md, (10, 12, 18, 255))
+          cta.save('callout_cta.png')
+
+          print(f"✅ Gráficos interactivos generados: {titulo} | Hook: {hook_complementario} | Callouts: {callouts_raw}")
           PYTHON_EXTRAER
 
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎥 Voz + Pulso Sonoro de Tensión + Pexels Anti-Repetición"
+      - name: "🎙️🎥 Voz Sin Silencios (Jump-Cut) + SFX Pop + Pexels Rápido (1.8s)"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          BUSQUEDA: ${{ github.event.client_payload.busqueda_pexels }}
         run: |
           AUDIO_OK=false
-          edge-tts --voice "es-ES-AlvaroNeural" --rate="+16%" --pitch="-2Hz" --volume="+8%" --file script_audio.txt --write-media audio_raw.mp3 2>/dev/null || true
+          edge-tts --voice "es-ES-AlvaroNeural" --rate="+22%" --pitch="-1Hz" --volume="+10%" --file script_audio.txt --write-media audio_raw.mp3 2>/dev/null || true
           if [ "$(stat -c%s audio_raw.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then AUDIO_OK=true; fi
           if [ "$AUDIO_OK" = "false" ]; then python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio_raw.mp3')" 2>/dev/null || true; fi
 
+          # AUDITORÍA STOP #1: Eliminamos el silencio inicial (0.0s) y acortamos pausas entre frases para ritmo de 175 WPM
+          ffmpeg -y -i audio_raw.mp3 -af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB:stop_periods=-1:stop_duration=0.14:stop_threshold=-42dB" -acodec pcm_s16le -ar 44100 -ac 1 voice_only.wav 2>/dev/null || \
           ffmpeg -y -i audio_raw.mp3 -acodec pcm_s16le -ar 44100 -ac 1 voice_only.wav 2>/dev/null
           if [ ! -s "voice_only.wav" ]; then exit 1; fi
 
-          DURACION=$(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice_only.wav 2>/dev/null || echo "30")
-          DURACION_FINAL=$(python3 -c "print(f'{max(12,min(56,float(\"$DURACION\"))):.2f}')")
+          DURACION=$(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice_only.wav 2>/dev/null || echo "25")
+          DURACION_FINAL=$(python3 -c "print(f'{max(12,min(42,float(\"$DURACION\"))):.2f}')")
           echo "$DURACION_FINAL" > dur.txt
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
 
+          # Generamos base rítmica + efectos de sonido "Pop" sincronizados con los Callouts (0.8s, 6.2s, 11.8s)
           cat << 'PYTHON_BGM' > /tmp/gen_bgm.py
           import numpy as np, wave
 
@@ -204,12 +236,23 @@ jobs:
           sr = 44100
           t = np.linspace(0, dur, int(sr * dur), endpoint=False)
 
-          beat_env = np.exp(-6.5 * np.mod(t, 0.666))
-          sub_bass = np.sin(2 * np.pi * 58.0 * t) * beat_env * 0.45
-          warm_pad = (np.sin(2 * np.pi * 116.0 * t) + 0.5 * np.sin(2 * np.pi * 174.0 * t)) * 0.12
-          hook_hit = np.exp(-9.0 * t) * np.sin(2 * np.pi * (95.0 - 40.0 * np.minimum(t, 1.0)) * t) * 0.65
+          # Pulso rápido de tensión (105 BPM -> cada 0.571s)
+          beat_env = np.exp(-7.5 * np.mod(t, 0.571))
+          sub_bass = np.sin(2 * np.pi * 60.0 * t) * beat_env * 0.48
+          warm_pad = (np.sin(2 * np.pi * 120.0 * t) + 0.4 * np.sin(2 * np.pi * 180.0 * t)) * 0.11
 
-          signal = np.clip((sub_bass + warm_pad + hook_hit) * 0.22, -0.95, 0.95)
+          # Impacto en el segundo 0.0 para retener en los primeros 3 segundos
+          hook_hit = np.exp(-10.0 * t) * np.sin(2 * np.pi * (110.0 - 50.0 * np.minimum(t, 0.8)) * t) * 0.75
+
+          # Sonidos "Pop" de interfaz cuando aparecen las etiquetas flotantes
+          pops = np.zeros_like(t)
+          for pt in [0.8, 6.2, 11.8]:
+              if pt < dur - 0.5:
+                  mask = (t >= pt) & (t < pt + 0.16)
+                  tl = t[mask] - pt
+                  pops[mask] = np.exp(-28.0 * tl) * np.sin(2 * np.pi * (520.0 + 1400.0 * tl) * tl) * 0.55
+
+          signal = np.clip((sub_bass + warm_pad + hook_hit + pops) * 0.24, -0.95, 0.95)
           pcm = (signal * 32767).astype(np.int16)
 
           with wave.open('bgm.wav', 'w') as wf:
@@ -221,7 +264,7 @@ jobs:
 
           python3 /tmp/gen_bgm.py || true
 
-          ffmpeg -y -i voice_only.wav -i bgm.wav -filter_complex "[0:a]volume=1.0[v];[1:a]volume=0.20[b];[v][b]amix=inputs=2:duration=first:dropout_transition=1,loudnorm=I=-16.5:TP=-1.2:LRA=7[outa]" -map "[outa]" -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null || cp voice_only.wav audio.wav
+          ffmpeg -y -i voice_only.wav -i bgm.wav -filter_complex "[0:a]volume=1.0[v];[1:a]volume=0.22[b];[v][b]amix=inputs=2:duration=first:dropout_transition=1,loudnorm=I=-16.0:TP=-1.1:LRA=6[outa]" -map "[outa]" -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null || cp voice_only.wav audio.wav
 
           cat << 'PYTHON_PEXELS' > /tmp/gen_pexels.py
           import os, sys, json, random, requests, urllib.parse
@@ -236,27 +279,18 @@ jobs:
               except Exception:
                   pass
 
-          print(f"🧠 IDs de Pexels bloqueados por historial reciente: {len(used_video_ids)}")
-
-          queries_raw = os.environ.get('BUSQUEDA', '').strip()
-          if not queries_raw and os.path.exists('payload.json'):
-              try:
-                  queries_raw = str(json.load(open('payload.json','r',encoding='utf-8')).get('busqueda_pexels',''))
-              except Exception:
-                  pass
-
+          queries_raw = open('pexels_queries.txt', 'r', encoding='utf-8').read().strip() if os.path.exists('pexels_queries.txt') else ''
           queries = [q.strip() for q in queries_raw.split(',') if q.strip()]
 
-          safe_football_pool = [
-              "football stadium night", "soccer match action", "football fans cheering",
-              "soccer stadium floodlights", "football player kicking ball", "stadium crowd flags",
-              "soccer pitch grass", "football goalkeeper gloves", "soccer dribbling ball",
-              "aerial football stadium", "ultras football fans", "soccer free kick",
-              "football boots turf", "soccer goal net", "stadium tunnel soccer",
-              "football players running", "soccer corner flag", "passionate football crowd"
+          safe_action_pool = [
+              "soccer match action", "football player kicking ball", "soccer dribbling ball",
+              "soccer tackle pitch", "soccer penalty kick", "football players running",
+              "soccer free kick", "football fans cheering", "passionate football crowd",
+              "ultras football fans", "football coach sideline", "soccer player closeup",
+              "stadium crowd flags", "soccer goal net", "football stadium night"
           ]
-          random.shuffle(safe_football_pool)
-          for b in safe_football_pool:
+          random.shuffle(safe_action_pool)
+          for b in safe_action_pool:
               if b not in queries:
                   queries.append(b)
 
@@ -264,7 +298,7 @@ jobs:
               'card', 'christmas', 'gift', 'present', 'beer', 'drink', 'wine', 'bar',
               'restaurant', 'table', 'party', 'hockey', 'basketball', 'baseball',
               'tennis', 'golf', 'rugby', 'american-football', 'nfl', 'yoga', 'fitness',
-              'dance', 'office', 'business', 'dog', 'cat', 'kitchen', 'couple'
+              'dance', 'office', 'business', 'dog', 'cat', 'kitchen', 'couple', 'empty'
           ]
 
           pexels_key = os.environ.get('PEXELS_API_KEY', '').strip()
@@ -287,7 +321,7 @@ jobs:
               if not pexels_key:
                   return False
               try:
-                  paginas = [1, 2, 3]
+                  paginas = [1, 2, 3, 4]
                   random.shuffle(paginas)
                   candidatos = []
 
@@ -326,22 +360,23 @@ jobs:
                               f.write(video_data)
 
                           norm_name = f"norm_clip_{idx}.mp4"
+                          # AUDITORÍA START #3: Cortes ultra rápidos de 1.85s para disparar la retención visual
                           filtro = (
                               "scale=1080:1920:force_original_aspect_ratio=increase,"
                               "crop=1080:1920,setsar=1,fps=30,"
-                              "eq=contrast=1.14:saturation=1.18:brightness=-0.10"
+                              "eq=contrast=1.15:saturation=1.20:brightness=-0.08"
                           )
-                          os.system(f'ffmpeg -y -ss 0.4 -i {clip_name} -t 2.9 -vf "{filtro}" -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -an {norm_name} 2>/dev/null')
+                          os.system(f'ffmpeg -y -ss 0.5 -i {clip_name} -t 1.85 -vf "{filtro}" -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -an {norm_name} 2>/dev/null')
                           if os.path.exists(norm_name) and os.path.getsize(norm_name) > 8000:
-                              print(f"   ✅ Clip #{idx+1} descargado (ID {vid_str} - '{query}').")
+                              print(f"   ✅ Clip #{idx+1} listo (ID {vid_str} - '{query}').")
                               return norm_name
               except Exception as e:
                   print(f"   ⚠️ Error en Pexels con '{query}': {e}")
               return False
 
-          print("🛡️ Descargando hasta 10 clips únicos de fútbol (cortes de 2.9s)...")
+          print("🛡️ Descargando 12 clips de acción rápida (cortes cada 1.85s)...")
           for q in queries:
-              if len(downloaded_clips) >= 10:
+              if len(downloaded_clips) >= 12:
                   break
               clip = descargar_video_pexels(q, len(downloaded_clips))
               if clip:
@@ -366,14 +401,14 @@ jobs:
 
           python3 /tmp/gen_pexels.py
 
-      - name: "💬 Generar Subtítulos Gigantes en Centro de Pantalla (Whisper)"
+      - name: "💬 Generar Subtítulos Dinámicos en Zona Segura (Whisper)"
         timeout-minutes: 15
         run: |
           python3 -c "
           import whisper, json, sys
           sys.stdout.reconfigure(encoding='utf-8')
           model = whisper.load_model('small')
-          result = model.transcribe('voice_only.wav', language='es', word_timestamps=True, temperature=0.0, initial_prompt='Debate táctico de fútbol, Champions League, goles, Mundial, entrenadores.')
+          result = model.transcribe('voice_only.wav', language='es', word_timestamps=True, temperature=0.0, initial_prompt='Récord histórico de fútbol, Champions League, goles, Mundial, táctica.')
           json.dump(result, open('audio.json','w',encoding='utf-8'), ensure_ascii=False)
           " 2>/dev/null || true
 
@@ -405,7 +440,7 @@ jobs:
               'GOL','GOLES','RÉCORD','RECORD','HISTORIA','BRUTAL','CRISIS','FRACASO',
               'MENTIRA','FRAUDE','CAMPEÓN','MUNDIAL','CHAMPIONS','MILLONES','PORCIENTO',
               'NUNCA','NADIE','DESASTRE','COLAPSO','PELIGRO','ERROR','BANQUILLO','LOCURA',
-              'IMPOSIBLE','SECRETO','PROBLEMA','VERDAD','ROBO','MILAGRO'
+              'IMPOSIBLE','SECRETO','PROBLEMA','VERDAD','ROBO','MILAGRO','SUERTE'
           }
 
           data = json.load(open('audio.json','r',encoding='utf-8'))
@@ -426,7 +461,7 @@ jobs:
               "",
               "[V4+ Styles]",
               "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-              f"Style: Default,{font_name},134,&H00FFFFFF,&H00FFFFFF,&H00000000,&HB4000000,-1,0,0,0,100,100,2,0,1,11,5,5,70,70,0,1",
+              f"Style: Default,{font_name},136,&H00FFFFFF,&H00FFFFFF,&H00000000,&HB4000000,-1,0,0,0,100,100,2,0,1,11,5,5,90,140,0,1",
               "",
               "[Events]",
               "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -454,27 +489,30 @@ jobs:
           for i, c in enumerate(chunks):
               end = chunks[i+1]['start'] if i < len(chunks)-1 else c['end'] + 0.18
               if c['start'] < end:
-                  lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{{\\pos(540,1060)\\fscx80\\fscy80\\t(0,85,\\fscx106\\fscy106)\\t(85,140,\\fscx100\\fscy100)}}{c['text']}")
+                  # Tercio medio-bajo (510, 1140) lejos de los botones derechos de Shorts y de los Callouts superiores
+                  lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{{\\pos(510,1140)\\fscx80\\fscy80\\t(0,80,\\fscx107\\fscy107)\\t(80,135,\\fscx100\\fscy100)}}{c['text']}")
 
           open('subtitles.ass','w',encoding='utf-8').write('\n'.join(header_lines + lines))
           PYTHON_ASS
 
           python3 /tmp/gen_ass.py
 
-      - name: "🎬 Renderizar Vídeo Final Box to Box FC"
+      - name: "🎬 Renderizar Vídeo Final con Callouts Sincronizados"
         timeout-minutes: 20
         run: |
           DUR=$(cat dur.txt)
+          CTA_START=$(python3 -c "print(f'{max(3.0, float(\"$DUR\") - 3.2):.2f}')")
           ASS_PATH=$(realpath subtitles.ass)
           ASS_ESC=$(echo "$ASS_PATH" | sed 's/:/\\:/g')
           FONTS_DIR="${HOME}/.fonts"
           FONTS_ESC=$(echo "$FONTS_DIR" | sed 's/:/\\:/g')
 
-          ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i overlay_ui.png \
-            -filter_complex "[0:v]scale=1080:1920,setsar=1[bg];[bg][2:v]overlay=0:0[ui];[ui]subtitles='${ASS_ESC}':fontsdir='${FONTS_ESC}'[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=16:color=0xFFD700@0.98:t=fill[outv]" \
+          # Superponemos: Cabecera compacta + 3 Callouts con puntero (0.8-5.2s, 6.2-10.8s, 11.8-16.5s) + Tarjeta Debate Final + Subtítulos
+          ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i overlay_ui.png -i callout_1.png -i callout_2.png -i callout_3.png -i callout_cta.png \
+            -filter_complex "[0:v]scale=1080:1920,setsar=1[bg];[bg][2:v]overlay=0:0[u0];[u0][3:v]overlay=0:0:enable='between(t\,0.8\,5.2)'[u1];[u1][4:v]overlay=0:0:enable='between(t\,6.2\,10.8)'[u2];[u2][5:v]overlay=0:0:enable='between(t\,11.8\,16.5)'[u3];[u3][6:v]overlay=0:0:enable='gte(t\,${CTA_START})'[u4];[u4]subtitles='${ASS_ESC}':fontsdir='${FONTS_ESC}'[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.98:t=fill[outv]" \
             -map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 21 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -t "$DUR" -movflags +faststart output.mp4
 
-      - name: "📺 Publicar en YouTube (Rotación Real de 4 Cuentas)"
+      - name: "📺 Publicar en YouTube + SEO Dinámico"
         id: youtube
         continue-on-error: true
         timeout-minutes: 10
@@ -493,7 +531,7 @@ jobs:
           YOUTUBE_REFRESH_TOKEN_4: ${{ secrets.YOUTUBE_REFRESH_TOKEN_4 }}
         run: |
           cat << 'PYTHON_YT' > /tmp/subir_yt.py
-          import os, sys
+          import os, sys, re
           from datetime import datetime, timezone
           from google.auth.transport.requests import Request
           from google.oauth2.credentials import Credentials
@@ -510,7 +548,6 @@ jobs:
               c_sec = os.environ.get(f'YOUTUBE_CLIENT_SECRET_{idx}', '').strip()
               r_tok = os.environ.get(f'YOUTUBE_REFRESH_TOKEN_{idx}', '').strip()
               if not c_id or not c_sec or not r_tok:
-                  print(f"⚠️ Credencial #{idx} vacía o incompleta.")
                   return None
               c = Credentials.from_authorized_user_info({
                   'client_id': c_id,
@@ -524,10 +561,13 @@ jobs:
 
           titulo = open('titulo.txt','r',encoding='utf-8').read().strip()[:100]
           desc = open('descripcion.txt','r',encoding='utf-8').read().strip()[:4900]
-          if '#Shorts' not in desc and '#shorts' not in desc:
-              desc = desc + "\n\n#Shorts #Futbol #BoxToBoxFC"
+          equipo = open('equipo.txt','r',encoding='utf-8').read().strip() if os.path.exists('equipo.txt') else 'futbol'
+          equipo_tag = re.sub(r'[^\w]', '', equipo.lower())
 
-          tags = ['futbol','shorts','futbolshorts','boxtoboxfc','tactica','championsleague','laliga','premierleague','mundial2026']
+          if '#Shorts' not in desc and '#shorts' not in desc:
+              desc = desc + f"\n\n#Shorts #Futbol #{equipo_tag} #BoxToBoxFC"
+
+          tags = ['futbol','shorts','futbolshorts','boxtoboxfc',equipo.lower(),equipo_tag,'recordsfutbol','championsleague','laliga','mundial']
           body = {
               'snippet': {
                   'title': titulo,
