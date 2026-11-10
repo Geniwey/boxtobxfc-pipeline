@@ -1,8 +1,8 @@
 # ==============================================================================
-# ⚽ BOX TO BOX FC - PIPELINE v48.0 (AUDITORÍA PRO + CALLOUTS FLOTANTES + 1.8s)
+# ⚽ BOX TO BOX FC - PIPELINE v50.0 (SISTEMA CAMALEÓN + 6 GRÁFICOS INTELIGENTES)
 # ==============================================================================
 
-name: "Box to Box FC - Pipeline v48.0"
+name: "Box to Box FC - Pipeline v50.0"
 
 concurrency:
   group: render-b2b-unico
@@ -39,7 +39,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: "🛠️ Instalar dependencias y fuentes XL"
+      - name: "🛠️ Instalar dependencias y fuentes Broadcast"
         timeout-minutes: 15
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -58,9 +58,9 @@ jobs:
           python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow --break-system-packages 2>/dev/null || python3 -m pip install --quiet openai-whisper edge-tts requests gtts google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client numpy tqdm Pillow
           python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>/dev/null || python3 -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
 
-      - name: "📝 Extraer textos + Cabecera Complementaria + Callouts Flotantes"
+      - name: "📝 Extraer y sanear textos del Payload"
         id: extraer
-        timeout-minutes: 3
+        timeout-minutes: 2
         env:
           TITULO_RAW: ${{ github.event.client_payload.titulo }}
           TITULO_VIRAL_RAW: ${{ github.event.client_payload.titulo_viral }}
@@ -75,7 +75,6 @@ jobs:
 
           cat << 'PYTHON_EXTRAER' > /tmp/extraer.py
           import os, sys, re, json
-          from PIL import Image, ImageDraw, ImageFont
           sys.stdout.reconfigure(encoding='utf-8')
 
           payload = {}
@@ -90,11 +89,11 @@ jobs:
               for c in ['\u200b','\u200c','\u200d','\u200e','\u200f','\u2060','\u00ad']:
                   t = t.replace(c, '')
               t = t.replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')
-              t = re.sub(r'\[(TITULO|TITULO_VIRAL|HOOK|DATO_\d|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
+              t = re.sub(r'\[(TITULO|TITULO_VIRAL|HOOK|OPCION_A|OPCION_B|DATO_\d|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
               return re.sub(r' {2,}', ' ', re.sub(r'\n{3,}', '\n\n', t)).strip()
 
           def sanitize_tts(t):
-              t = re.sub(r'\[(TITULO|TITULO_VIRAL|HOOK|DATO_\d|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
+              t = re.sub(r'\[(TITULO|TITULO_VIRAL|HOOK|OPCION_A|OPCION_B|DATO_\d|DESCRIPCION|GUION|PEXELS_\d|FIN)\]', '', t, flags=re.I)
               return re.sub(r'[^\w\s\.,;:\?!¡¿áéíóúÁÉÍÓÚñÑüÜ\%\-]', '', re.sub(r'[\*\"\'\«\»\(\)\[\]\{\}\#\_\|\~]', '', t)).strip()
 
           raw_title = (
@@ -117,154 +116,51 @@ jobs:
           script_text = clean(raw_script)[:4900] or 'Déjame tu opinión en los comentarios.'
           script_audio = sanitize_tts(script_text)
 
-          # Desempaquetamos búsqueda_pexels||HOOK||DATO1|DATO2|DATO3
           busqueda_full = os.environ.get('BUSQUEDA_RAW', '').strip() or str(payload.get('busqueda_pexels') or '').strip()
           parts = busqueda_full.split('||')
           pexels_only = parts[0].strip() if len(parts) > 0 else ''
-          hook_complementario = parts[1].strip() if len(parts) > 1 and parts[1].strip() else 'DATO CLAVE'
-          callouts_raw = parts[2].strip().split('|') if len(parts) > 2 and parts[2].strip() else []
+          hook_complementario = parts[1].strip() if len(parts) > 1 and parts[1].strip() else 'DATO OFICIAL'
+          meta_raw = parts[2].strip().split('|') if len(parts) > 2 and parts[2].strip() else []
 
-          while len(callouts_raw) < 3:
-              callouts_raw.append(equipo.upper()[:18])
+          op_a = meta_raw[0].strip() if len(meta_raw) > 0 and meta_raw[0].strip() else 'MÉRITO HISTÓRICO'
+          op_b = meta_raw[1].strip() if len(meta_raw) > 1 and meta_raw[1].strip() else 'FLOR DE UN DÍA'
+          cat_tema = meta_raw[2].strip() if len(meta_raw) > 2 and meta_raw[2].strip() else 'epica'
 
           open('pexels_queries.txt','w',encoding='utf-8').write(pexels_only)
+          open('hook_header.txt','w',encoding='utf-8').write(hook_complementario)
+          open('poll_options.json','w',encoding='utf-8').write(json.dumps({'opA': op_a, 'opB': op_b, 'cat': cat_tema}, ensure_ascii=False))
           open('titulo.txt','w',encoding='utf-8').write(titulo)
           open('descripcion.txt','w',encoding='utf-8').write(descripcion)
           open('script.txt','w',encoding='utf-8').write(script_text)
           open('script_audio.txt','w',encoding='utf-8').write(script_audio)
           open('titulo_corto.txt','w',encoding='utf-8').write(titulo[:55])
           open('equipo.txt','w',encoding='utf-8').write(equipo)
-
-          font_path = os.path.expanduser('~/.fonts/BebasNeue.ttf')
-          try:
-              font_sm = ImageFont.truetype(font_path, 34)
-              font_md = ImageFont.truetype(font_path, 52)
-              font_lg = ImageFont.truetype(font_path, 58)
-          except Exception:
-              font_sm = ImageFont.load_default()
-              font_md = ImageFont.load_default()
-              font_lg = ImageFont.load_default()
-
-          def draw_centered(draw_obj, x_center, y_center, txt, fnt, color):
-              try:
-                  bb = draw_obj.textbbox((0, 0), txt, font=fnt)
-                  w, h = bb[2] - bb[0], bb[3] - bb[1]
-              except Exception:
-                  w, h = len(txt) * 18, 34
-              draw_obj.text((int(x_center - w / 2), int(y_center - h / 2 - 4)), txt, font=fnt, fill=color)
-
-          # 1. CABECERA COMPACTA ESTILO MARCADOR TV (Regla de Complementariedad: no repite el título y deja libre el centro)
-          ui = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
-          d_ui = ImageDraw.Draw(ui)
-          for y in range(280):
-              a = int(160 * (1 - y / 280.0))
-              d_ui.line([(0, y), (1080, y)], fill=(5, 7, 12, a))
-          for y in range(1450, 1920):
-              a = int(185 * ((y - 1450) / 470.0))
-              d_ui.line([(0, y), (1080, y)], fill=(5, 7, 12, a))
-
-          # Marcador superior izquierdo (Protagonista) + derecho (Hook Complementario de 3 palabras)
-          d_ui.rounded_rectangle([65, 115, 535, 195], radius=14, fill=(255, 215, 0, 245))
-          draw_centered(d_ui, 300, 155, equipo.upper()[:20], font_md, (10, 12, 18, 255))
-
-          d_ui.rounded_rectangle([545, 115, 1015, 195], radius=14, fill=(12, 16, 26, 235), outline=(255, 215, 0, 230), width=3)
-          draw_centered(d_ui, 780, 155, hook_complementario.upper()[:20], font_md, (255, 255, 255, 255))
-          ui.save('overlay_ui.png')
-
-          # 2. GENERADOR DE ETIQUETAS FLOTANTES CON PUNTERO (ESTILO VÍDEO DEL LAVAVAJILLAS)
-          def crear_callout(filename, texto, box_x, box_y, target_x, target_y, accent_rgb):
-              im = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
-              dr = ImageDraw.Draw(im)
-              box_w, box_h = 460, 96
-              cx = box_x + box_w // 2
-              cy = box_y + box_h // 2
-
-              # Línea indicadora y punto de radar (Target)
-              dr.line([(cx, cy), (target_x, target_y)], fill=(255, 255, 255, 230), width=5)
-              dr.ellipse([target_x - 22, target_y - 22, target_x + 22, target_y + 22], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 95), outline=(255, 255, 255, 240), width=3)
-              dr.ellipse([target_x - 9, target_y - 9, target_x + 9, target_y + 9], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 255))
-
-              # Píldora oscura con borde neón
-              dr.rounded_rectangle([box_x, box_y, box_x + box_w, box_y + box_h], radius=22, fill=(10, 14, 22, 238), outline=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 255), width=4)
-              dr.ellipse([box_x + 22, cy - 10, box_x + 42, cy + 10], fill=(accent_rgb[0], accent_rgb[1], accent_rgb[2], 255))
-              draw_centered(dr, cx + 14, cy, texto.upper()[:22], font_lg, (255, 255, 255, 255))
-              im.save(filename)
-
-          crear_callout('callout_1.png', callouts_raw[0], 70, 360, 620, 620, (255, 215, 0))
-          crear_callout('callout_2.png', callouts_raw[1], 550, 420, 430, 680, (0, 255, 140))
-          crear_callout('callout_3.png', callouts_raw[2], 80, 460, 640, 700, (0, 210, 255))
-
-          # 3. TARJETA FINAL DE INTERACCIÓN Y DEBATE (Últimos 3 segundos)
-          cta = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
-          d_cta = ImageDraw.Draw(cta)
-          d_cta.rounded_rectangle([140, 1340, 940, 1445], radius=26, fill=(255, 215, 0, 248), outline=(255, 255, 255, 255), width=4)
-          draw_centered(d_cta, 540, 1392, "DEBATE EN COMENTARIOS  •  TE LEO ABAJO", font_md, (10, 12, 18, 255))
-          cta.save('callout_cta.png')
-
-          print(f"✅ Gráficos interactivos generados: {titulo} | Hook: {hook_complementario} | Callouts: {callouts_raw}")
+          print(f"✅ Textos listos: {titulo} | Encuesta: {op_a} vs {op_b}")
           PYTHON_EXTRAER
 
           python3 /tmp/extraer.py
           echo "titulo_corto=$(python3 -c "print(open('titulo_corto.txt',encoding='utf-8').read().strip())" 2>/dev/null || echo "Box to Box FC")" >> $GITHUB_OUTPUT
 
-      - name: "🎙️🎥 Voz Sin Silencios (Jump-Cut) + SFX Pop + Pexels Rápido (1.8s)"
+      - name: "🎙️🎥 Voz Natural (25-30s) + Pexels 100% Fútbol Contextual"
         id: audio_bg_gen
         timeout-minutes: 30
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
           AUDIO_OK=false
-          edge-tts --voice "es-ES-AlvaroNeural" --rate="+22%" --pitch="-1Hz" --volume="+10%" --file script_audio.txt --write-media audio_raw.mp3 2>/dev/null || true
+          edge-tts --voice "es-ES-AlvaroNeural" --rate="+15%" --pitch="-1Hz" --volume="+10%" --file script_audio.txt --write-media audio_raw.mp3 2>/dev/null || true
           if [ "$(stat -c%s audio_raw.mp3 2>/dev/null || echo 0)" -gt 5000 ]; then AUDIO_OK=true; fi
           if [ "$AUDIO_OK" = "false" ]; then python3 -c "from gtts import gTTS; gTTS(text=open('script_audio.txt',encoding='utf-8').read(), lang='es').save('audio_raw.mp3')" 2>/dev/null || true; fi
 
-          # AUDITORÍA STOP #1: Eliminamos el silencio inicial (0.0s) y acortamos pausas entre frases para ritmo de 175 WPM
-          ffmpeg -y -i audio_raw.mp3 -af "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-45dB:stop_periods=-1:stop_duration=0.14:stop_threshold=-42dB" -acodec pcm_s16le -ar 44100 -ac 1 voice_only.wav 2>/dev/null || \
+          # Quitamos solo el silencio inicial (0.0s) respetando las pausas dramáticas del locutor
+          ffmpeg -y -i audio_raw.mp3 -af "silenceremove=start_periods=1:start_duration=0.02:start_threshold=-45dB" -acodec pcm_s16le -ar 44100 -ac 1 voice_only.wav 2>/dev/null || \
           ffmpeg -y -i audio_raw.mp3 -acodec pcm_s16le -ar 44100 -ac 1 voice_only.wav 2>/dev/null
           if [ ! -s "voice_only.wav" ]; then exit 1; fi
 
-          DURACION=$(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice_only.wav 2>/dev/null || echo "25")
-          DURACION_FINAL=$(python3 -c "print(f'{max(12,min(42,float(\"$DURACION\"))):.2f}')")
+          DURACION=$(ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice_only.wav 2>/dev/null || echo "26")
+          DURACION_FINAL=$(python3 -c "print(f'{max(14,min(55,float(\"$DURACION\"))):.2f}')")
           echo "$DURACION_FINAL" > dur.txt
           echo "video_duration=${DURACION_FINAL}" >> $GITHUB_OUTPUT
-
-          # Generamos base rítmica + efectos de sonido "Pop" sincronizados con los Callouts (0.8s, 6.2s, 11.8s)
-          cat << 'PYTHON_BGM' > /tmp/gen_bgm.py
-          import numpy as np, wave
-
-          dur = float(open('dur.txt').read().strip()) + 1.0
-          sr = 44100
-          t = np.linspace(0, dur, int(sr * dur), endpoint=False)
-
-          # Pulso rápido de tensión (105 BPM -> cada 0.571s)
-          beat_env = np.exp(-7.5 * np.mod(t, 0.571))
-          sub_bass = np.sin(2 * np.pi * 60.0 * t) * beat_env * 0.48
-          warm_pad = (np.sin(2 * np.pi * 120.0 * t) + 0.4 * np.sin(2 * np.pi * 180.0 * t)) * 0.11
-
-          # Impacto en el segundo 0.0 para retener en los primeros 3 segundos
-          hook_hit = np.exp(-10.0 * t) * np.sin(2 * np.pi * (110.0 - 50.0 * np.minimum(t, 0.8)) * t) * 0.75
-
-          # Sonidos "Pop" de interfaz cuando aparecen las etiquetas flotantes
-          pops = np.zeros_like(t)
-          for pt in [0.8, 6.2, 11.8]:
-              if pt < dur - 0.5:
-                  mask = (t >= pt) & (t < pt + 0.16)
-                  tl = t[mask] - pt
-                  pops[mask] = np.exp(-28.0 * tl) * np.sin(2 * np.pi * (520.0 + 1400.0 * tl) * tl) * 0.55
-
-          signal = np.clip((sub_bass + warm_pad + hook_hit + pops) * 0.24, -0.95, 0.95)
-          pcm = (signal * 32767).astype(np.int16)
-
-          with wave.open('bgm.wav', 'w') as wf:
-              wf.setnchannels(1)
-              wf.setsampwidth(2)
-              wf.setframerate(sr)
-              wf.writeframes(pcm.tobytes())
-          PYTHON_BGM
-
-          python3 /tmp/gen_bgm.py || true
-
-          ffmpeg -y -i voice_only.wav -i bgm.wav -filter_complex "[0:a]volume=1.0[v];[1:a]volume=0.22[b];[v][b]amix=inputs=2:duration=first:dropout_transition=1,loudnorm=I=-16.0:TP=-1.1:LRA=6[outa]" -map "[outa]" -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null || cp voice_only.wav audio.wav
 
           cat << 'PYTHON_PEXELS' > /tmp/gen_pexels.py
           import os, sys, json, random, requests, urllib.parse
@@ -283,29 +179,37 @@ jobs:
           queries = [q.strip() for q in queries_raw.split(',') if q.strip()]
 
           safe_action_pool = [
-              "soccer match action", "football player kicking ball", "soccer dribbling ball",
-              "soccer tackle pitch", "soccer penalty kick", "football players running",
-              "soccer free kick", "football fans cheering", "passionate football crowd",
-              "ultras football fans", "football coach sideline", "soccer player closeup",
-              "stadium crowd flags", "soccer goal net", "football stadium night"
+              "soccer stadium night", "football stadium crowd", "soccer match stadium",
+              "football fans cheering stadium", "soccer goal net stadium", "soccer pitch floodlights",
+              "soccer corner kick", "football stadium aerial", "soccer goalkeeper stadium",
+              "soccer penalty kick stadium", "ultras football fans", "soccer ball stadium grass",
+              "football referee stadium", "soccer players tunnel", "football stadium lights"
           ]
           random.shuffle(safe_action_pool)
           for b in safe_action_pool:
               if b not in queries:
                   queries.append(b)
 
+          must_have_slug = ['soccer', 'football', 'stadium', 'goal-net', 'penalty', 'goalkeeper', 'pitch']
+
           banned_url_terms = [
+              'basketball', 'hoop', 'court', 'nba', 'dunk', 'netball',
+              'hockey', 'ice', 'skate', 'puck', 'helmet', 'locker',
+              'american-football', 'nfl', 'rugby', 'touchdown', 'quarterback',
+              'baseball', 'bat', 'tennis', 'golf', 'volleyball', 'badminton',
+              'cone', 'cones', 'drill', 'medal', 'medals', 'ceremony',
+              'girl', 'girls', 'woman', 'women', 'female', 'kid', 'kids', 'child', 'children', 'boy', 'boys', 'youth',
+              'indoor', 'tent', 'gym', 'workout', 'fitness', 'yoga', 'dance',
+              'beach', 'street', 'park', 'backyard', 'freestyle', 'juggling',
               'card', 'christmas', 'gift', 'present', 'beer', 'drink', 'wine', 'bar',
-              'restaurant', 'table', 'party', 'hockey', 'basketball', 'baseball',
-              'tennis', 'golf', 'rugby', 'american-football', 'nfl', 'yoga', 'fitness',
-              'dance', 'office', 'business', 'dog', 'cat', 'kitchen', 'couple', 'empty'
+              'restaurant', 'table', 'party', 'office', 'business', 'dog', 'cat', 'couple'
           ]
 
           pexels_key = os.environ.get('PEXELS_API_KEY', '').strip()
           downloaded_clips = []
           newly_used_ids = []
 
-          def es_video_valido(v):
+          def es_video_valido(v, strict=True):
               vid = str(v.get('id', ''))
               if not vid or vid in used_video_ids:
                   return False
@@ -313,6 +217,8 @@ jobs:
               for term in banned_url_terms:
                   if term in url_slug:
                       return False
+              if strict and not any(ok in url_slug for ok in must_have_slug):
+                  return False
               if v.get('duration', 0) < 3:
                   return False
               return True
@@ -326,16 +232,16 @@ jobs:
                   candidatos = []
 
                   for pag in paginas:
-                      url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=25&page={pag}"
+                      url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&orientation=portrait&per_page=30&page={pag}"
                       res = requests.get(url, headers={'Authorization': pexels_key}, timeout=15).json()
-                      candidatos = [v for v in res.get('videos', []) if es_video_valido(v)]
+                      candidatos = [v for v in res.get('videos', []) if es_video_valido(v, strict=True)]
                       if candidatos:
                           break
 
                   if not candidatos:
-                      url_any = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&per_page=25&page={random.choice([1,2])}"
+                      url_any = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(query)}&per_page=30&page={random.choice([1,2])}"
                       res_any = requests.get(url_any, headers={'Authorization': pexels_key}, timeout=15).json()
-                      candidatos = [v for v in res_any.get('videos', []) if es_video_valido(v)]
+                      candidatos = [v for v in res_any.get('videos', []) if es_video_valido(v, strict=True)]
 
                   if candidatos:
                       random.shuffle(candidatos)
@@ -360,21 +266,20 @@ jobs:
                               f.write(video_data)
 
                           norm_name = f"norm_clip_{idx}.mp4"
-                          # AUDITORÍA START #3: Cortes ultra rápidos de 1.85s para disparar la retención visual
                           filtro = (
                               "scale=1080:1920:force_original_aspect_ratio=increase,"
                               "crop=1080:1920,setsar=1,fps=30,"
-                              "eq=contrast=1.15:saturation=1.20:brightness=-0.08"
+                              "eq=contrast=1.16:saturation=1.18:brightness=-0.12"
                           )
-                          os.system(f'ffmpeg -y -ss 0.5 -i {clip_name} -t 1.85 -vf "{filtro}" -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -an {norm_name} 2>/dev/null')
+                          os.system(f'ffmpeg -y -ss 0.5 -i {clip_name} -t 2.2 -vf "{filtro}" -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -an {norm_name} 2>/dev/null')
                           if os.path.exists(norm_name) and os.path.getsize(norm_name) > 8000:
-                              print(f"   ✅ Clip #{idx+1} listo (ID {vid_str} - '{query}').")
+                              print(f"   ✅ Clip #{idx+1} 100% Fútbol listo (ID {vid_str} - '{query}').")
                               return norm_name
               except Exception as e:
                   print(f"   ⚠️ Error en Pexels con '{query}': {e}")
               return False
 
-          print("🛡️ Descargando 12 clips de acción rápida (cortes cada 1.85s)...")
+          print("🛡️ Descargando clips verificados de fútbol de élite (cortes cada 2.2s)...")
           for q in queries:
               if len(downloaded_clips) >= 12:
                   break
@@ -401,14 +306,14 @@ jobs:
 
           python3 /tmp/gen_pexels.py
 
-      - name: "💬 Generar Subtítulos Dinámicos en Zona Segura (Whisper)"
+      - name: "🎨 Motor Camaleón IA: Paletas Dinámicas + 3 Layouts + 6 Gráficos Contextuales"
         timeout-minutes: 15
         run: |
           python3 -c "
           import whisper, json, sys
           sys.stdout.reconfigure(encoding='utf-8')
           model = whisper.load_model('small')
-          result = model.transcribe('voice_only.wav', language='es', word_timestamps=True, temperature=0.0, initial_prompt='Récord histórico de fútbol, Champions League, goles, Mundial, táctica.')
+          result = model.transcribe('voice_only.wav', language='es', word_timestamps=True, temperature=0.0, initial_prompt='Análisis táctico de fútbol, Champions League, goles, marcador, récord histórico, Mundial.')
           json.dump(result, open('audio.json','w',encoding='utf-8'), ensure_ascii=False)
           " 2>/dev/null || true
 
@@ -418,38 +323,495 @@ jobs:
           t=open('script.txt',encoding='utf-8').read().strip().split()
           d=float(open('dur.txt').read().strip())
           tpw=d/max(len(t),1)
-          json.dump({'segments':[{'start':i*tpw,'end':(i+1)*tpw,'words':[{'word':w,'start':i*tpw,'end':(i+1)*tpw}]}for i,w in enumerate(t)]},open('audio.json','w',encoding='utf-8'))
+          json.dump({'segments':[{'start':i*tpw,'end':(i+1)*tpw,'text':w,'words':[{'word':w,'start':i*tpw,'end':(i+1)*tpw}]}for i,w in enumerate(t)]},open('audio.json','w',encoding='utf-8'))
           "
           fi
 
-          cat << 'PYTHON_ASS' > /tmp/gen_ass.py
-          import json, os, sys, re
+          cat << 'PYTHON_CHAMELEON_HUD' > /tmp/gen_broadcast_hud.py
+          import os, sys, re, json, math, textwrap, wave, hashlib
+          import numpy as np
+          from PIL import Image, ImageDraw, ImageFont
           sys.stdout.reconfigure(encoding='utf-8')
 
+          dur = float(open('dur.txt').read().strip())
+          equipo = open('equipo.txt','r',encoding='utf-8').read().strip()
+          titulo = open('titulo.txt','r',encoding='utf-8').read().strip()
+          hook_header = open('hook_header.txt','r',encoding='utf-8').read().strip()
+          poll_info = json.load(open('poll_options.json','r',encoding='utf-8'))
+          op_a = poll_info.get('opA', 'MÉRITO HISTÓRICO')
+          op_b = poll_info.get('opB', 'FLOR DE UN DÍA')
+          cat_tema = poll_info.get('cat', 'epica')
+          data = json.load(open('audio.json','r',encoding='utf-8'))
+
+          # ==============================================================================
+          # 1. SISTEMA CAMALEÓN: SELECCIÓN INTELIGENTE DE PALETA Y LAYOUT SEGÚN EL VÍDEO
+          # ==============================================================================
+          seed_int = int(hashlib.md5((equipo + titulo).encode('utf-8')).hexdigest()[:8], 16)
+          layout_style = seed_int % 3  # 0: Broadcast Split, 1: Bento Dual Grid, 2: Tactical Pro Banner
+
+          THEMES = [
+              {
+                  "name": "UEFA_CHAMPIONS_GOLD",
+                  "primary": (255, 215, 0),
+                  "secondary": (0, 225, 255),
+                  "bg_panel": (8, 12, 24, 238),
+                  "bg_box": (16, 24, 44, 255),
+                  "badge": "CHAMPIONS DATA",
+                  "ass_num": "&H0000D7FF&",
+                  "ass_kw": "&H00FFFF00&"
+              },
+              {
+                  "name": "OPTA_NEON_ANALYTICS",
+                  "primary": (0, 255, 135),
+                  "secondary": (255, 215, 0),
+                  "bg_panel": (7, 15, 18, 238),
+                  "bg_box": (14, 28, 34, 255),
+                  "badge": "OPTA ANALYTICS",
+                  "ass_num": "&H0087FF00&",
+                  "ass_kw": "&H0000D7FF&"
+              },
+              {
+                  "name": "CRISIS_RED_ALERT",
+                  "primary": (255, 50, 95),
+                  "secondary": (255, 185, 0),
+                  "bg_panel": (18, 8, 14, 238),
+                  "bg_box": (34, 14, 24, 255),
+                  "badge": "ALERTA TÁCTICA",
+                  "ass_num": "&H005F32FF&",
+                  "ass_kw": "&H0000B9FF&"
+              },
+              {
+                  "name": "MUNDIAL_ELECTRIC_CYAN",
+                  "primary": (0, 225, 255),
+                  "secondary": (0, 255, 150),
+                  "bg_panel": (6, 14, 24, 238),
+                  "bg_box": (12, 26, 44, 255),
+                  "badge": "ARCHIVO MUNDIAL",
+                  "ass_num": "&H00FFE100&",
+                  "ass_kw": "&H0096FF00&"
+              },
+              {
+                  "name": "ROYAL_PURPLE_ELITE",
+                  "primary": (190, 90, 255),
+                  "secondary": (0, 245, 212),
+                  "bg_panel": (14, 8, 24, 238),
+                  "bg_box": (26, 16, 44, 255),
+                  "badge": "ELITE SCOUTING",
+                  "ass_num": "&H00D4F500&",
+                  "ass_kw": "&H00FF5ABE&"
+              }
+          ]
+
+          eq_low = (equipo + " " + titulo).lower()
+          if cat_tema == "tactica" or "posesión" in eq_low or "cambios" in eq_low:
+              theme = THEMES[2] if (seed_int % 2 == 0) else THEMES[1]
+          elif any(k in eq_low for k in ["mundial", "sukur", "fontaine", "alemania", "dinamarca", "grecia", "marruecos"]):
+              theme = THEMES[3]
+          elif any(k in eq_low for k in ["madrid", "zidane", "cristiano", "messi", "milan", "steaua"]):
+              theme = THEMES[0]
+          else:
+              theme = THEMES[seed_int % len(THEMES)]
+
+          pri = theme["primary"]
+          sec = theme["secondary"]
+          bg_panel = theme["bg_panel"]
+          bg_box = theme["bg_box"]
+
+          print(f"🎨 Estilo visual seleccionado: {theme['name']} | Layout Modo #{layout_style}")
+
+          font_path = os.path.expanduser('~/.fonts/BebasNeue.ttf')
+          def get_font(sz):
+              try:
+                  return ImageFont.truetype(font_path, sz)
+              except Exception:
+                  return ImageFont.load_default()
+
+          f_xs = get_font(28)
+          f_sm = get_font(36)
+          f_md = get_font(48)
+          f_lg = get_font(62)
+          f_xl = get_font(84)
+
+          def draw_text(dr, x, y, txt, fnt, fill, align="left"):
+              txt = str(txt)
+              try:
+                  bb = dr.textbbox((0, 0), txt, font=fnt)
+                  w, h = bb[2] - bb[0], bb[3] - bb[1]
+              except Exception:
+                  w, h = len(txt) * 18, 32
+              if align == "center":
+                  x = int(x - w / 2)
+              elif align == "right":
+                  x = int(x - w)
+              dr.text((int(x), int(y - h / 2 - 3)), txt, font=fnt, fill=fill)
+
+          # ==============================================================================
+          # 2. CAPA BASE DE RETRANSMISIÓN ADAPTADA AL TEMA (HUD_BASE.PNG)
+          # ==============================================================================
+          base = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+          db = ImageDraw.Draw(base)
+
+          for y in range(490):
+              a = int(205 * (1 - (y / 490.0)**1.3))
+              db.line([(0, y), (1080, y)], fill=(5, 8, 15, a))
+          for y in range(1260, 1920):
+              a = int(230 * ((y - 1260) / 660.0)**1.2)
+              db.line([(0, y), (1080, y)], fill=(5, 8, 15, a))
+
+          protag_clean = re.sub(r'[^\w\s\-]', '', equipo).upper().strip()[:20]
+          hook_clean = re.sub(r'[^\w\s\%\-]', '', hook_header).upper().strip()[:18]
+
+          if layout_style == 0:
+              # Cabecera Scoreboard Clásica
+              db.rounded_rectangle([55, 95, 1025, 185], radius=16, fill=bg_panel, outline=(pri[0], pri[1], pri[2], 140), width=3)
+              db.rounded_rectangle([55, 95, 290, 185], radius=16, fill=(pri[0], pri[1], pri[2], 255))
+              draw_text(db, 172, 140, theme["badge"], f_sm, (10, 12, 18, 255), "center")
+              draw_text(db, 315, 140, protag_clean, f_lg, (255, 255, 255, 255), "left")
+              db.rounded_rectangle([760, 112, 1005, 168], radius=10, fill=bg_box, outline=(sec[0], sec[1], sec[2], 220), width=2)
+              draw_text(db, 882, 140, hook_clean, f_xs, (sec[0], sec[1], sec[2], 255), "center")
+          elif layout_style == 1:
+              # Cabecera Bento Dual (Dos píldoras flotantes separadas)
+              db.rounded_rectangle([55, 95, 640, 185], radius=18, fill=bg_panel, outline=(pri[0], pri[1], pri[2], 240), width=3)
+              db.ellipse([80, 128, 104, 152], fill=(pri[0], pri[1], pri[2], 255))
+              draw_text(db, 125, 140, protag_clean, f_lg, (255, 255, 255, 255), "left")
+              db.rounded_rectangle([660, 95, 1025, 185], radius=18, fill=(pri[0], pri[1], pri[2], 250))
+              draw_text(db, 842, 140, hook_clean, f_md, (10, 12, 18, 255), "center")
+          else:
+              # Cabecera Barra Táctica Superior con acento lateral
+              db.rounded_rectangle([55, 95, 1025, 185], radius=14, fill=bg_panel, outline=(255, 255, 255, 60), width=2)
+              db.rounded_rectangle([55, 95, 78, 185], radius=6, fill=(pri[0], pri[1], pri[2], 255))
+              draw_text(db, 105, 140, f"{protag_clean}  •  {hook_clean}", f_md, (255, 255, 255, 255), "left")
+              db.rounded_rectangle([810, 114, 1005, 166], radius=8, fill=(pri[0], pri[1], pri[2], 255))
+              draw_text(db, 907, 140, "BOX TO BOX", f_xs, (10, 12, 18, 255), "center")
+
+          base.save('hud_base.png')
+
+          # ==============================================================================
+          # 3. ANÁLISIS SEMÁNTICO DE WHISPER: QUÉ DICE CADA FRASE Y QUÉ GRÁFICO NECESITA
+          # ==============================================================================
+          all_words = [
+              {'word': w.get('word','').strip(), 'start': float(w.get('start',0.0)), 'end': float(w.get('end',0.0))}
+              for s in data.get('segments',[])
+              for w in s.get('words',[])
+              if w.get('word','').strip() and float(w.get('end',0)) > float(w.get('start',0))
+          ]
+
+          cta_start = max(4.5, round(dur - 3.4, 2))
+          usable_end = max(3.8, cta_start - 0.15)
+
+          active_words = [w for w in all_words if w['start'] < usable_end]
+          if not active_words:
+              active_words = [{'word': equipo, 'start': 0.2, 'end': usable_end}]
+
+          num_cards = 4 if usable_end >= 11.0 else 3
+          chunk_size = max(1, math.ceil(len(active_words) / num_cards))
+          word_groups = [active_words[i:i + chunk_size] for i in range(0, len(active_words), chunk_size)][:num_cards]
+
+          num_map = {
+              'CERO':'0','UN':'1','UNO':'1','UNA':'1','DOS':'2','TRES':'3','CUATRO':'4','CINCO':'5',
+              'SEIS':'6','SIETE':'7','OCHO':'8','NUEVE':'9','DIEZ':'10','ONCE':'11',
+              'DOCE':'12','TRECE':'13','QUINCE':'15','VEINTE':'20','TREINTA':'30','CIEN':'100'
+          }
+
+          stopwords = {
+              'EL','LA','LOS','LAS','UN','UNA','DE','DEL','AL','EN','CON','POR','PARA',
+              'SIN','SOBRE','ENTRE','QUE','SE','SU','SUS','ES','SON','FUE','ERA','PERO',
+              'COMO','MÁS','MAS','MUY','YA','NO','SI','O','Y','A','ANTE','CONTRA','CADA'
+          }
+
+          def analizar_bloque_voz(group, idx, used_charts):
+              raw_phrase = ' '.join(w['word'] for w in group)
+              upper_phrase = re.sub(r'[^\w\s\%\-áéíóúÁÉÍÓÚñÑ]', ' ', raw_phrase).upper()
+              tokens = [t for t in upper_phrase.split() if t]
+              norm_tokens = [num_map.get(t, t) for t in tokens]
+              norm_str = ' '.join(norm_tokens)
+
+              stat_big = None
+              stat_unit = "MÉTRICA CLAVE"
+              preferred_chart = None
+
+              # Detección de marcador ("4 A 1", "1 A 7", "2 A 0")
+              m_score = re.search(r'\b(\d)\s*(?:A|\-)\s*(\d)\b', norm_str)
+              if m_score:
+                  stat_big = f"{m_score.group(1)} - {m_score.group(2)}"
+                  stat_unit = "MARCADOR OFICIAL"
+                  preferred_chart = "shotmap"
+
+              # Detección de porcentaje ("70%", "42 POR CIENTO")
+              if not stat_big:
+                  m_pct = re.search(r'\b(\d{1,3})\s*(?:\%|POR\s*CIENTO)\b', norm_str)
+                  if m_pct:
+                      stat_big = f"{m_pct.group(1)}%"
+                      stat_unit = "PORCENTAJE OPTA"
+                      preferred_chart = "gauge"
+
+              # Detección de número + sustantivo ("91 GOLES", "11 SEGUNDOS", "58 PARTIDOS")
+              if not stat_big:
+                  m_num_noun = re.search(r'\b(\d{1,4})\s+([A-ZÁÉÍÓÚÑ]{3,12})\b', norm_str)
+                  if m_num_noun:
+                      stat_big = m_num_noun.group(1)
+                      stat_unit = m_num_noun.group(2)[:12]
+
+              if not stat_big:
+                  m_any = re.search(r'\b(\d{1,4})\b', norm_str)
+                  if m_any:
+                      stat_big = m_any.group(1)
+                      stat_unit = "DATO VERIFICADO"
+
+              if not stat_big:
+                  meaningful = [t for t in norm_tokens if len(t) >= 5 and t not in stopwords]
+                  stat_big = (meaningful[0][:10] if meaningful else f"ACTO 0{idx+1}")
+                  stat_unit = "CLAVE TÁCTICA"
+
+              # Selección inteligente del gráfico según las palabras dichas en esa frase
+              if not preferred_chart:
+                  if any(w in norm_str for w in ['GOL', 'GOLES', 'PORTERO', 'PENALTI', 'PENALTIS', 'PUERTA', 'TIRO', 'ARCO']):
+                      preferred_chart = "shotmap"
+                  elif any(w in norm_str for w in ['MINUTO', 'MINUTOS', 'SEGUNDO', 'SEGUNDOS', 'DESCANSO', 'AÑO', 'AÑOS', 'JORNADAS', 'SEGUIDAS']):
+                      preferred_chart = "timeline"
+                  elif any(w in norm_str for w in ['DEFENSA', 'MEDIOCAMPO', 'ESPALDA', 'METROS', 'CAMPO', 'BLOQUE', 'PIZARRA', 'LATERALES']):
+                      preferred_chart = "pitch"
+                  elif any(w in norm_str for w in ['RÉCORD', 'HISTORIA', 'CAMPEÓN', 'CHAMPIONS', 'MUNDIAL', 'MILLONES', 'CUOTA']):
+                      preferred_chart = "bars"
+                  else:
+                      preferred_chart = "momentum"
+
+              all_chart_types = ["shotmap", "pitch", "Timeline", "bars", "gauge", "momentum"]
+              all_chart_types = [c.lower() for c in all_chart_types]
+              if preferred_chart in used_charts:
+                  for alt in all_chart_types:
+                      if alt not in used_charts:
+                          preferred_chart = alt
+                          break
+              used_charts.add(preferred_chart)
+
+              clean_words = [t for t in tokens if t not in {'Y','O','PERO','QUE'} or len(tokens) < 6]
+              headline_str = ' '.join(clean_words[:10])
+              wrapped = textwrap.wrap(headline_str, width=21)[:2]
+              if not wrapped:
+                  wrapped = [protag_clean]
+
+              return stat_big, stat_unit, wrapped, preferred_chart
+
+          # ==============================================================================
+          # 4. MOTOR DE 6 GRÁFICOS VECTORIALES INTELIGENTES (CERO PLANTILLAS REPETIDAS)
+          # ==============================================================================
+          def dibujar_grafico_inteligente(dr, chart_type, x0, y0, w, h, acc, sec_col):
+              dr.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=16, fill=bg_box, outline=(255, 255, 255, 45), width=2)
+
+              if chart_type == "shotmap":
+                  # PORTERÍA + MAPA DE DISPAROS xG (Cuando habla de goles, tiros, penaltis o porteros)
+                  draw_text(dr, x0 + w // 2, y0 + 20, "MAPA DE GOL xG", f_xs, (acc[0], acc[1], acc[2], 255), "center")
+                  gx1, gy1, gx2, gy2 = x0 + 26, y0 + 42, x0 + w - 26, y0 + h - 24
+                  # Postes y larguero de la portería
+                  dr.line([(gx1, gy2), (gx1, gy1), (gx2, gy1), (gx2, gy2)], fill=(255, 255, 255, 230), width=4)
+                  # Red de la portería
+                  for nx in range(gx1 + 20, gx2, 22):
+                      dr.line([(nx, gy1 + 3), (nx, gy2)], fill=(255, 255, 255, 35), width=1)
+                  for ny in range(gy1 + 18, gy2, 20):
+                      dr.line([(gx1 + 3, ny), (gx2 - 3, ny)], fill=(255, 255, 255, 35), width=1)
+                  # Impactos de gol en las escuadras
+                  targets = [(gx1 + 28, gy1 + 24, 14), (gx2 - 30, gy1 + 28, 16), ((gx1 + gx2)//2, gy2 - 22, 11)]
+                  for (tx, ty, tr) in targets:
+                      dr.ellipse([tx - tr, ty - tr, tx + tr, ty + tr], fill=(acc[0], acc[1], acc[2], 110), outline=(acc[0], acc[1], acc[2], 255), width=3)
+                      dr.ellipse([tx - 5, ty - 5, tx + 5, ty + 5], fill=(255, 255, 255, 255))
+
+              elif chart_type == "pitch":
+                  # PIZARRA TÁCTICA VECTORIAL (Cuando habla de defensa, mediocampo, metros, presión)
+                  px1, py1, px2, py2 = x0 + 18, y0 + 18, x0 + w - 18, y0 + h - 18
+                  dr.rectangle([px1, py1, px2, py2], outline=(255, 255, 255, 110), width=2)
+                  mid_x, mid_y = (px1 + px2) // 2, (py1 + py2) // 2
+                  dr.line([(mid_x, py1), (mid_x, py2)], fill=(255, 255, 255, 80), width=2)
+                  dr.ellipse([mid_x - 22, mid_y - 22, mid_x + 22, mid_y + 22], outline=(255, 255, 255, 80), width=2)
+                  pts = [(px1 + 24, py2 - 24), (mid_x - 8, py1 + 34), (px2 - 26, mid_y - 10)]
+                  dr.line(pts, fill=(acc[0], acc[1], acc[2], 255), width=4)
+                  for (nx, ny) in pts:
+                      dr.ellipse([nx - 8, ny - 8, nx + 8, ny + 8], fill=(acc[0], acc[1], acc[2], 255), outline=(255, 255, 255, 255), width=2)
+
+              elif chart_type == "timeline":
+                  # CRONÓMETRO / LÍNEA DE TIEMPO 0'-90' (Cuando habla de minutos, segundos o rachas)
+                  draw_text(dr, x0 + w // 2, y0 + 24, "CRONOLOGÍA CLAVE", f_xs, (acc[0], acc[1], acc[2], 255), "center")
+                  ly = y0 + h // 2 + 8
+                  lx1, lx2 = x0 + 24, x0 + w - 24
+                  dr.line([(lx1, ly), (lx2, ly)], fill=(90, 105, 135, 255), width=4)
+                  marks = [(lx1, "0'"), ((lx1 + lx2)//2, "45'"), (lx2 - 18, "90'")]
+                  for (mx, mlabel) in marks:
+                      dr.ellipse([mx - 7, ly - 7, mx + 7, ly + 7], fill=(200, 210, 230, 255))
+                      draw_text(dr, mx, ly + 28, mlabel, f_xs, (180, 195, 220, 255), "center")
+                  # Nodo explosivo en el momento clave
+                  hx = lx2 - 36
+                  dr.ellipse([hx - 18, ly - 18, hx + 18, ly + 18], fill=(acc[0], acc[1], acc[2], 95), outline=(acc[0], acc[1], acc[2], 255), width=3)
+                  dr.ellipse([hx - 7, ly - 7, hx + 7, ly + 7], fill=(255, 255, 255, 255))
+                  draw_text(dr, hx, ly - 32, "CLAVE", f_xs, (acc[0], acc[1], acc[2], 255), "center")
+
+              elif chart_type == "gauge":
+                  # MEDIDOR DE DOMINIO TÁCTICO / PORCENTAJES
+                  draw_text(dr, x0 + w // 2, y0 + 24, "BALANCE TÁCTICO", f_xs, (255, 255, 255, 240), "center")
+                  labels = ["ATA", "PRE", "EFEC"]
+                  pcts = [0.92, 0.68, 0.86]
+                  for ri in range(3):
+                      ry = y0 + 52 + ri * 46
+                      draw_text(dr, x0 + 20, ry + 8, labels[ri], f_xs, (acc[0], acc[1], acc[2], 255), "left")
+                      bx1, bx2 = x0 + 78, x0 + w - 20
+                      dr.rounded_rectangle([bx1, ry, bx2, ry + 18], radius=8, fill=(35, 45, 68, 255))
+                      fw = int((bx2 - bx1) * pcts[ri])
+                      dr.rounded_rectangle([bx1, ry, bx1 + fw, ry + 18], radius=8, fill=(acc[0], acc[1], acc[2], 255))
+
+              elif chart_type == "bars":
+                  # BARRAS COMPARATIVAS DE RÉCORD HISTÓRICO
+                  draw_text(dr, x0 + w // 2, y0 + 20, "ESCALA HISTÓRICA", f_xs, (acc[0], acc[1], acc[2], 255), "center")
+                  bars = [0.35, 0.50, 0.45, 0.68, 0.96]
+                  bw, gap = 24, 14
+                  start_x = x0 + 24
+                  base_y = y0 + h - 20
+                  max_bh = h - 52
+                  for bi, val in enumerate(bars):
+                      bx = start_x + bi * (bw + gap)
+                      bh = int(max_bh * val)
+                      c_bar = (acc[0], acc[1], acc[2], 255) if bi == len(bars) - 1 else (65, 80, 110, 220)
+                      dr.rounded_rectangle([bx, base_y - bh, bx + bw, base_y], radius=6, fill=c_bar)
+
+              else:
+                  # CURVA DE MOMENTUM / RENDIMIENTO
+                  draw_text(dr, x0 + w // 2, y0 + 20, "CURVA DE IMPACTO", f_xs, (acc[0], acc[1], acc[2], 255), "center")
+                  pts = [
+                      (x0 + 22, y0 + h - 28),
+                      (x0 + 65, y0 + h - 52),
+                      (x0 + 110, y0 + h - 42),
+                      (x0 + 155, y0 + 52),
+                      (x0 + w - 24, y0 + 36)
+                  ]
+                  dr.line(pts, fill=(acc[0], acc[1], acc[2], 255), width=5)
+                  lx, ly = pts[-1]
+                  dr.ellipse([lx - 10, ly - 10, lx + 10, ly + 10], fill=(acc[0], acc[1], acc[2], 255), outline=(255, 255, 255, 255), width=3)
+
+          used_charts = set()
+          cards_meta = []
+
+          for idx, grp in enumerate(word_groups):
+              t_start = round(max(0.15, grp[0]['start'] - 0.05), 2)
+              if idx < len(word_groups) - 1:
+                  t_end = round(max(t_start + 0.8, word_groups[idx + 1][0]['start'] - 0.08), 2)
+              else:
+                  t_end = round(max(t_start + 0.8, usable_end), 2)
+
+              stat_big, stat_unit, wrapped_lines, chart_type = analizar_bloque_voz(grp, idx, used_charts)
+              acc = pri if (idx % 2 == 0) else sec
+
+              im = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+              dr = ImageDraw.Draw(im)
+
+              if layout_style == 1:
+                  # MODO BENTO DUAL: Dos tarjetas separadas con aire entre ellas
+                  dr.rounded_rectangle([55, 205, 735, 455], radius=24, fill=bg_panel, outline=(acc[0], acc[1], acc[2], 245), width=4)
+                  dr.rounded_rectangle([755, 205, 1025, 455], radius=24, fill=bg_panel, outline=(255, 255, 255, 80), width=3)
+              else:
+                  # MODO BROADCAST PANEL COMPLETO
+                  dr.rounded_rectangle([55, 205, 1025, 455], radius=24, fill=bg_panel, outline=(acc[0], acc[1], acc[2], 245), width=4)
+
+              # Bloque Izquierdo: Dato Gigante extraído de la frase
+              dr.rounded_rectangle([75, 225, 345, 435], radius=18, fill=bg_box, outline=(acc[0], acc[1], acc[2], 140), width=2)
+              dr.rounded_rectangle([92, 238, 328, 276], radius=8, fill=(acc[0], acc[1], acc[2], 255))
+              draw_text(dr, 210, 257, stat_unit[:14], f_xs, (10, 12, 18, 255), "center")
+
+              font_stat = f_xl if len(str(stat_big)) <= 6 else f_lg
+              draw_text(dr, 210, 344, str(stat_big), font_stat, (255, 255, 255, 255), "center")
+
+              dr.rounded_rectangle([92, 404, 328, 418], radius=6, fill=(35, 45, 65, 255))
+              prog_w = int(236 * (0.74 + 0.08 * (idx % 3)))
+              dr.rounded_rectangle([92, 404, 92 + prog_w, 418], radius=6, fill=(acc[0], acc[1], acc[2], 255))
+
+              # Columna Central: Frase sincronizada con la voz
+              draw_text(dr, 370, 248, f"EN VIVO • DATO 0{idx+1}", f_xs, (acc[0], acc[1], acc[2], 255), "left")
+              y_line = 305 if len(wrapped_lines) > 1 else 330
+              for ln in wrapped_lines:
+                  draw_text(dr, 370, y_line, ln, f_md, (255, 255, 255, 255), "left")
+                  y_line += 56
+
+              for bi in range(11):
+                  bx = 370 + bi * 22
+                  bh = 10 + ((bi * 7 + idx * 5) % 18)
+                  dr.rounded_rectangle([bx, 422 - bh, bx + 12, 422], radius=3, fill=(acc[0], acc[1], acc[2], 210))
+
+              # Columna Derecha: Gráfico Inteligente adaptado a las palabras de esa frase
+              dibujar_grafico_inteligente(dr, chart_type, 765, 225, 240, 210, acc, sec)
+
+              fname = f"card_{idx}.png"
+              im.save(fname)
+              cards_meta.append({'file': fname, 'start': t_start, 'end': t_end, 'stat': stat_big, 'chart': chart_type})
+              print(f"   📊 Tarjeta #{idx+1} [{t_start}s-{t_end}s] ({chart_type}): [{stat_big}] -> {' / '.join(wrapped_lines)}")
+
+          # ==============================================================================
+          # 5. TARJETA FINAL DE ENCUESTA ADAPTADA AL DEBATE DEL VÍDEO (OPCIÓN A vs OPCIÓN B)
+          # ==============================================================================
+          cta_im = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+          d_cta = ImageDraw.Draw(cta_im)
+
+          d_cta.rounded_rectangle([55, 205, 1025, 465], radius=24, fill=bg_panel, outline=(pri[0], pri[1], pri[2], 255), width=4)
+          d_cta.rounded_rectangle([290, 222, 790, 266], radius=10, fill=(pri[0], pri[1], pri[2], 255))
+          draw_text(d_cta, 540, 244, "ENCUESTA DEL DÍA • VOTA A O B ABAJO", f_xs, (10, 12, 18, 255), "center")
+
+          d_cta.rounded_rectangle([85, 288, 520, 435], radius=16, fill=bg_box, outline=(0, 255, 135, 245), width=3)
+          draw_text(d_cta, 302, 330, "COMENTA 'A'", f_xs, (0, 255, 135, 255), "center")
+          draw_text(d_cta, 302, 385, op_a[:18], f_md, (255, 255, 255, 255), "center")
+
+          d_cta.rounded_rectangle([560, 288, 995, 435], radius=16, fill=bg_box, outline=(255, 65, 105, 245), width=3)
+          draw_text(d_cta, 777, 330, "COMENTA 'B'", f_xs, (255, 65, 105, 255), "center")
+          draw_text(d_cta, 777, 385, op_b[:18], f_md, (255, 255, 255, 255), "center")
+
+          d_cta.rounded_rectangle([120, 1340, 960, 1445], radius=24, fill=(pri[0], pri[1], pri[2], 250), outline=(255, 255, 255, 255), width=4)
+          draw_text(d_cta, 540, 1392, f"¿{op_a[:14]} O {op_b[:14]}? TE LEO 👇", f_md, (10, 12, 18, 255), "center")
+
+          cta_im.save('card_cta.png')
+          json.dump({'cards': cards_meta, 'cta_start': cta_start, 'dur': dur}, open('cards_timing.json','w',encoding='utf-8'))
+
+          # ==============================================================================
+          # 6. BASE SONORA + SFX SINCRONIZADOS AL MILISEGUNDO CON CADA CAMBIO DE TARJETA
+          # ==============================================================================
+          sr = 44100
+          total_dur = dur + 0.8
+          t = np.linspace(0, total_dur, int(sr * total_dur), endpoint=False)
+
+          beat_env = np.exp(-7.0 * np.mod(t, 0.58))
+          sub_bass = np.sin(2 * np.pi * 58.0 * t) * beat_env * 0.45
+          warm_pad = (np.sin(2 * np.pi * 116.0 * t) + 0.4 * np.sin(2 * np.pi * 174.0 * t)) * 0.10
+          hook_hit = np.exp(-9.5 * t) * np.sin(2 * np.pi * (105.0 - 45.0 * np.minimum(t, 0.8)) * t) * 0.70
+
+          sfx = np.zeros_like(t)
+          trigger_times = [c['start'] for c in cards_meta] + [cta_start]
+          for pt in trigger_times:
+              if 0.05 <= pt < total_dur - 0.25:
+                  mask = (t >= pt) & (t < pt + 0.18)
+                  tl = t[mask] - pt
+                  sfx[mask] = np.exp(-24.0 * tl) * np.sin(2 * np.pi * (480.0 + 1500.0 * tl) * tl) * 0.58
+
+          signal = np.clip((sub_bass + warm_pad + hook_hit + sfx) * 0.23, -0.95, 0.95)
+          pcm = (signal * 32767).astype(np.int16)
+          with wave.open('bgm.wav', 'w') as wf:
+              wf.setnchannels(1)
+              wf.setsampwidth(2)
+              wf.setframerate(sr)
+              wf.writeframes(pcm.tobytes())
+
+          # ==============================================================================
+          # 7. SUBTÍTULOS DINÁMICOS CON LOS COLORES DEL TEMA CAMALEÓN
+          # ==============================================================================
           font_name = os.environ.get('FONT_NAME', 'Bebas Neue')
-          gold_color = "&H0000D7FF&"
-          green_color = "&H0050FF00&"
+          ass_num_col = theme["ass_num"]
+          ass_kw_col = theme["ass_kw"]
 
           def fmt(s):
               return f"{int(s//3600)}:{int((s%3600)//60):02d}:{int(s%60):02d}.{min(int(round((s%1)*100)),99):02d}"
 
-          def clean(t):
-              return re.sub(r' {2,}', ' ', t.replace('{','').replace('}','').replace('\\','').replace('\n',' ')).strip()
+          def clean_sub(txt):
+              return re.sub(r' {2,}', ' ', txt.replace('{','').replace('}','').replace('\\','').replace('\n',' ')).strip()
 
           impact_keywords = {
               'GOL','GOLES','RÉCORD','RECORD','HISTORIA','BRUTAL','CRISIS','FRACASO',
-              'MENTIRA','FRAUDE','CAMPEÓN','MUNDIAL','CHAMPIONS','MILLONES','PORCIENTO',
+              'MENTIRA','FRAUDE','CAMPEÓN','CAMPEONES','MUNDIAL','CHAMPIONS','MILLONES',
               'NUNCA','NADIE','DESASTRE','COLAPSO','PELIGRO','ERROR','BANQUILLO','LOCURA',
-              'IMPOSIBLE','SECRETO','PROBLEMA','VERDAD','ROBO','MILAGRO','SUERTE'
+              'IMPOSIBLE','SECRETO','PROBLEMA','VERDAD','ROBO','MILAGRO','SUERTE','RIAZOR'
           }
-
-          data = json.load(open('audio.json','r',encoding='utf-8'))
-          all_words = [
-              {'word': clean(w.get('word','')), 'start': w.get('start',0.0), 'end': w.get('end',0.0)}
-              for s in data.get('segments',[])
-              for w in s.get('words',[])
-              if w.get('word','').strip() and w.get('end',0) > w.get('start',0)
-          ]
 
           header_lines = [
               "[Script Info]",
@@ -461,7 +823,7 @@ jobs:
               "",
               "[V4+ Styles]",
               "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-              f"Style: Default,{font_name},136,&H00FFFFFF,&H00FFFFFF,&H00000000,&HB4000000,-1,0,0,0,100,100,2,0,1,11,5,5,90,140,0,1",
+              f"Style: Default,{font_name},138,&H00FFFFFF,&H00FFFFFF,&H00000000,&HB4000000,-1,0,0,0,100,100,2,0,1,12,6,5,80,120,0,1",
               "",
               "[Events]",
               "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -469,13 +831,13 @@ jobs:
 
           chunks, cur, chars = [], [], 0
           for i, w in enumerate(all_words):
-              w_upper = w['word'].upper().strip()
+              w_upper = clean_sub(w['word']).upper()
               clean_w = re.sub(r'[^\w]','',w_upper)
-              has_number = bool(re.search(r'\d', w_upper))
+              has_number = bool(re.search(r'\d', w_upper)) or (clean_w in num_map)
               if has_number:
-                  w_text = f"{{\\c{green_color}}}{w_upper}{{\\c&H00FFFFFF&}}"
+                  w_text = f"{{\\c{ass_num_col}}}{w_upper}{{\\c&H00FFFFFF&}}"
               elif clean_w in impact_keywords:
-                  w_text = f"{{\\c{gold_color}}}{w_upper}{{\\c&H00FFFFFF&}}"
+                  w_text = f"{{\\c{ass_kw_col}}}{w_upper}{{\\c&H00FFFFFF&}}"
               else:
                   w_text = w_upper
 
@@ -489,28 +851,71 @@ jobs:
           for i, c in enumerate(chunks):
               end = chunks[i+1]['start'] if i < len(chunks)-1 else c['end'] + 0.18
               if c['start'] < end:
-                  # Tercio medio-bajo (510, 1140) lejos de los botones derechos de Shorts y de los Callouts superiores
-                  lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{{\\pos(510,1140)\\fscx80\\fscy80\\t(0,80,\\fscx107\\fscy107)\\t(80,135,\\fscx100\\fscy100)}}{c['text']}")
+                  lines.append(f"Dialogue: 0,{fmt(c['start'])},{fmt(end)},Default,,0,0,0,,{{\\pos(525,1160)\\fscx82\\fscy82\\t(0,75,\\fscx107\\fscy107)\\t(75,130,\\fscx100\\fscy100)}}{c['text']}")
 
           open('subtitles.ass','w',encoding='utf-8').write('\n'.join(header_lines + lines))
-          PYTHON_ASS
+          PYTHON_CHAMELEON_HUD
 
-          python3 /tmp/gen_ass.py
+          python3 /tmp/gen_broadcast_hud.py
 
-      - name: "🎬 Renderizar Vídeo Final con Callouts Sincronizados"
+          ffmpeg -y -i voice_only.wav -i bgm.wav -filter_complex "[0:a]volume=1.0[v];[1:a]volume=0.22[b];[v][b]amix=inputs=2:duration=first:dropout_transition=1,loudnorm=I=-16.0:TP=-1.1:LRA=6[outa]" -map "[outa]" -acodec pcm_s16le -ar 44100 -ac 1 audio.wav 2>/dev/null || cp voice_only.wav audio.wav
+
+      - name: "🎬 Renderizar Vídeo Final con Infografías Sincronizadas"
         timeout-minutes: 20
         run: |
-          DUR=$(cat dur.txt)
-          CTA_START=$(python3 -c "print(f'{max(3.0, float(\"$DUR\") - 3.2):.2f}')")
-          ASS_PATH=$(realpath subtitles.ass)
-          ASS_ESC=$(echo "$ASS_PATH" | sed 's/:/\\:/g')
-          FONTS_DIR="${HOME}/.fonts"
-          FONTS_ESC=$(echo "$FONTS_DIR" | sed 's/:/\\:/g')
+          cat << 'PYTHON_RENDER' > /tmp/run_render.py
+          import os, json, subprocess
 
-          # Superponemos: Cabecera compacta + 3 Callouts con puntero (0.8-5.2s, 6.2-10.8s, 11.8-16.5s) + Tarjeta Debate Final + Subtítulos
-          ffmpeg -y -stream_loop -1 -i pexels.mp4 -i audio.wav -i overlay_ui.png -i callout_1.png -i callout_2.png -i callout_3.png -i callout_cta.png \
-            -filter_complex "[0:v]scale=1080:1920,setsar=1[bg];[bg][2:v]overlay=0:0[u0];[u0][3:v]overlay=0:0:enable='between(t\,0.8\,5.2)'[u1];[u1][4:v]overlay=0:0:enable='between(t\,6.2\,10.8)'[u2];[u2][5:v]overlay=0:0:enable='between(t\,11.8\,16.5)'[u3];[u3][6:v]overlay=0:0:enable='gte(t\,${CTA_START})'[u4];[u4]subtitles='${ASS_ESC}':fontsdir='${FONTS_ESC}'[vwithsubs];[vwithsubs]drawbox=x=0:y=0:w='min(iw\,iw*t/${DUR})':h=14:color=0xFFD700@0.98:t=fill[outv]" \
-            -map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 21 -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -t "$DUR" -movflags +faststart output.mp4
+          timing = json.load(open('cards_timing.json', 'r', encoding='utf-8'))
+          dur = timing['dur']
+          cta_start = timing['cta_start']
+          cards = timing['cards']
+
+          ass_path = os.path.abspath('subtitles.ass').replace(':', '\\:')
+          fonts_dir = os.path.expanduser('~/.fonts').replace(':', '\\:')
+
+          cmd = [
+              'ffmpeg', '-y',
+              '-stream_loop', '-1', '-i', 'pexels.mp4',
+              '-i', 'audio.wav',
+              '-i', 'hud_base.png'
+          ]
+
+          for c in cards:
+              cmd.extend(['-i', c['file']])
+          cmd.extend(['-i', 'card_cta.png'])
+
+          fc = ["[0:v]scale=1080:1920,setsar=1[bg]", "[bg][2:v]overlay=0:0[u0]"]
+          last_label = "u0"
+
+          for idx, c in enumerate(cards):
+              in_idx = 3 + idx
+              next_label = f"u{idx+1}"
+              s_t = c['start']
+              e_t = c['end']
+              fc.append(f"[{last_label}][{in_idx}:v]overlay=0:0:enable='between(t\\,{s_t}\\,{e_t})'[{next_label}]")
+              last_label = next_label
+
+          cta_idx = 3 + len(cards)
+          fc.append(f"[{last_label}][{cta_idx}:v]overlay=0:0:enable='gte(t\\,{cta_start})'[ucta]")
+          fc.append(f"[ucta]subtitles='{ass_path}':fontsdir='{fonts_dir}'[vsubs]")
+          fc.append(f"[vsubs]drawbox=x=0:y=0:w='min(iw\\,iw*t/{dur})':h=14:color=0xFFD700@0.98:t=fill[outv]")
+
+          cmd.extend([
+              '-filter_complex', ';'.join(fc),
+              '-map', '[outv]', '-map', '1:a',
+              '-c:v', 'libx264', '-preset', 'fast', '-crf', '21',
+              '-pix_fmt', 'yuv420p', '-r', '30',
+              '-c:a', 'aac', '-b:a', '192k',
+              '-t', str(dur), '-movflags', '+faststart', 'output.mp4'
+          ])
+
+          print("🎬 Ejecutando FFmpeg Chameleon Broadcast Render...")
+          subprocess.run(cmd, check=True)
+          print("✅ Render completado con éxito.")
+          PYTHON_RENDER
+
+          python3 /tmp/run_render.py
 
       - name: "📺 Publicar en YouTube + SEO Dinámico"
         id: youtube
