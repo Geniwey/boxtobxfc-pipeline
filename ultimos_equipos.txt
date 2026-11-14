@@ -1,4 +1,3 @@
-Bayer Leverkusen 2023-24
 Napoli
 España
 Manchester United
@@ -30,3 +29,4 @@ FC Barcelona
 AC Milan
 Real Madrid 2022
 Chelsea
+Francia
