@@ -1,4 +1,3 @@
-Alemania
 Deportivo 2004
 Dinamarca 1992
 Bayern Munich
@@ -30,3 +29,4 @@ Francia
 Zidane Entrenador
 Leicester City 2016
 Sadio Mané 2015
+Chelsea 2004-05
