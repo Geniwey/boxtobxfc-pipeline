@@ -1,4 +1,3 @@
-Napoli
 España
 Manchester United
 Alemania
@@ -30,3 +29,4 @@ AC Milan
 Real Madrid 2022
 Chelsea
 Francia
+Zidane Entrenador
