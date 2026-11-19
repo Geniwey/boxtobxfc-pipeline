@@ -1,4 +1,3 @@
-Francia
 Zidane Entrenador
 Leicester City 2016
 Sadio Mané 2015
@@ -30,3 +29,4 @@ Alemania
 Rogerio Ceni
 Just Fontaine 1958
 Real Madrid 2022
+Manchester City
