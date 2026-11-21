@@ -1,4 +1,3 @@
-Alemania 2014
 Grecia 2004
 Steaua Bucarest 1986
 Juventus
@@ -30,3 +29,4 @@ Dinamarca 1992
 FC Barcelona
 Inglaterra
 Lionel Messi 2012
+Cristiano Ronaldo 2014
