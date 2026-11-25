@@ -1,4 +1,3 @@
-Sadio Mané 2015
 Chelsea
 Argentina
 Dinamarca 1992
@@ -30,3 +29,4 @@ Rogerio Ceni
 Dinamarca 1992
 Alemania 2014
 Sadio Mané 2015
+Chelsea 2004-05
